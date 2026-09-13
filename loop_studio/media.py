@@ -10,7 +10,7 @@ from pathlib import Path
 from .core import ident, validate
 
 
-def run(args, cancel=None, timeout=1800):
+def run(args, cancel=None, timeout=1800, capture_log=False):
     # Capture to a temporary file to avoid a full stderr pipe deadlocking FFmpeg.
     import tempfile
     with tempfile.TemporaryFile() as errors:
@@ -29,7 +29,7 @@ def run(args, cancel=None, timeout=1800):
         errors.seek(0)
         if process.returncode:
             raise ValueError("Media processing failed: " + errors.read().decode(errors="replace")[-1400:])
-        return b""
+        return errors.read() if capture_log else b""
 
 
 def probe(path):

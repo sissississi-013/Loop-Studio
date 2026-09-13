@@ -2,6 +2,7 @@
 const $ = id => document.getElementById(id);
 let project = null, selected = null, proposal = null, playingShot = null, lastJobs = new Map(), config = {};
 let editChain = Promise.resolve();
+let jobRenderKey = null;
 const dirty = new Set();
 const fileURL = path => `/files/${project.id}/${path}`;
 const time = seconds => `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(1).padStart(4, '0')}`;
@@ -38,7 +39,7 @@ function edit(operation) {
       if(operation.op==='settings') {
         if(operation.brief!==undefined) dirty.delete('brief');
         if(operation.name!==undefined) dirty.delete('project-name');
-        if(operation.style) for(const id of ['aspect','look','title','title-size','font','title-position','title-background','music','source-volume','music-volume']) dirty.delete(id);
+        if(operation.style) for(const id of ['aspect','look','title','title-size','font','shot-seconds','title-position','title-background','music','source-volume','music-volume']) dirty.delete(id);
       }
       if(operation.op==='shot') for(const id of ['trim-start','trim-end','shot-volume','shot-caption']) dirty.delete(id);
       render();
@@ -54,13 +55,14 @@ function render() {
   if (!project) return;
   setField('project-name',project.name);
   setField('brief',project.brief);
-  for(const [key,id] of Object.entries({aspect:'aspect',look:'look',title:'title',title_size:'title-size',font:'font',title_position:'title-position',music:'music',source_volume:'source-volume',music_volume:'music-volume'})) setField(id,project.style[key]);
+  for(const [key,id] of Object.entries({aspect:'aspect',look:'look',title:'title',title_size:'title-size',font:'font',shot_seconds:'shot-seconds',title_position:'title-position',music:'music',source_volume:'source-volume',music_volume:'music-volume'})) setField(id,project.style[key]);
   if(!dirty.has('title-background')) $('title-background').checked=project.style.title_background;
   const clips=Object.values(project.assets).filter(a=>a.kind!=='reference');
   $('asset-count').textContent=`${clips.length} / 10`;
   $('assets').replaceChildren(...clips.map(assetCard));
   $('references').replaceChildren(...Object.values(project.assets).filter(a=>a.kind==='reference').map(assetCard));
   $('sample').hidden=Object.keys(project.assets).length>0;
+  $('discard').hidden=!dirty.size;
   $('undo').disabled=!project.undo.length; $('redo').disabled=!project.redo.length;
   $('preview').disabled=$('export').disabled=!project.timeline.length;
   $('direct').disabled=$('analyze').disabled=!clips.length;
@@ -87,11 +89,15 @@ function assetCard(asset) {
   actions.append(button('View',()=>showVideo(fileURL(asset.proxy),asset.name,'Full-duration source proxy')));
   if(asset.kind!=='reference') actions.append(button('+ Add shot',()=>edit({op:'add',asset_id:asset.id,start:0,end:Math.min(asset.duration,5)})));
   const analysis=project.analysis[asset.id];
-  if(asset.kind==='reference'&&analysis) actions.append(button('Use color look',()=>edit({op:'settings',style:analysis.reference_style})));
+  if(asset.kind==='reference'&&analysis) actions.append(button('Use look & pace',()=>edit({op:'settings',style:analysis.reference_style})));
   node.append(actions);
   if(analysis) {
-    const details=el('details'), summary=el('summary',analysis.mode==='model'?'Visual notes & moments':'Sampled moments · offline');
+    const details=el('details'), summary=el('summary',analysis.mode==='model'?'AI notes · review for accuracy':'Sampled moments · offline');
     details.append(summary,el('p',analysis.description,'analysis-text'));
+    const notes=el('textarea'); notes.rows=3; notes.value=project.notes?.[asset.id]??analysis.description;
+    notes.setAttribute('aria-label',`Correct footage notes for ${asset.name}`);
+    details.append(notes,button('Save corrected notes',()=>edit({op:'notes',asset_id:asset.id,text:notes.value})));
+    if(asset.kind==='reference') details.append(el('p',`Suggested look: ${analysis.reference_style.look}${analysis.reference_style.shot_seconds?` · estimated cut length ${analysis.reference_style.shot_seconds}s`:''}. Scene-change estimates are editable, not a guarantee of matching the reference.`,'analysis-text'));
     if(analysis.selection_notice) details.append(el('p',analysis.selection_notice,'analysis-text'));
     const contact=el('a','View contact sheet'); contact.href=fileURL(analysis.contact); contact.target='_blank'; contact.rel='noreferrer';details.append(contact);
     if(asset.kind!=='reference') for(const candidate of [...analysis.candidates].sort((a,b)=>b.score-a.score).slice(0,4)) details.append(button(`${time(candidate.start)}–${time(candidate.end)} · ${candidate.description}`,()=>edit({op:'add',asset_id:asset.id,start:candidate.start,end:candidate.end}),'candidate'));
@@ -144,14 +150,18 @@ async function pollJobs() {
     if(project&&job.project_id===project.id&&previous!==job.status&&job.status==='completed') {
       await reload();
       if(job.name==='Draft edit') {
-        proposal=job.result; $('rationale').textContent=proposal.rationale;
+        proposal=job.result; $('rationale').textContent=`${proposal.timeline.length} shots · ${time(proposal.duration)} calculated duration. ${proposal.mode==='model'?'Model explanation (review for accuracy): ':''}${proposal.rationale}`;
         $('proposal-shots').replaceChildren(...proposal.timeline.map(s=>el('p',`${project.assets[s.asset_id].name}: ${time(s.start)}–${time(s.end)}`)));
         $('proposal').hidden=false;
       } else if(job.name==='Preview'||job.name==='Export') showVideo(fileURL(job.result.path),project.name,`Version ${job.result.version} · rendered ${job.result.preview?'preview':'export'}`);
     }
     lastJobs.set(job.id,job.status);
   }
-  $('jobs').replaceChildren(...jobs.filter(j=>project&&j.project_id===project.id).slice(-5).reverse().map(job=>{
+  const shown=jobs.filter(j=>project&&j.project_id===project.id).slice(-5).reverse();
+  const key=JSON.stringify(shown);
+  if(key===jobRenderKey) return;
+  jobRenderKey=key;
+  $('jobs').replaceChildren(...shown.map(job=>{
     const node=el('div',null,`job ${job.status}`); node.append(el('span',`${job.name} · ${job.message}`));
     if(['queued','running'].includes(job.status)) node.append(button('Cancel',()=>api(`/jobs/${job.id}/cancel`,{})));
     return node;
@@ -162,6 +172,7 @@ bind('new-project','click',async()=>{const p=await api('/projects',{name:'Untitl
 bind('projects','change',()=>openProject($('projects').value));
 bind('project-name','change',()=>edit({op:'settings',name:$('project-name').value}));
 bind('brief','change',()=>edit({op:'settings',brief:$('brief').value}));
+bind('discard','click',()=>{dirty.clear();render();$('save-state').textContent='Saved locally';});
 bind('undo','click',()=>edit({op:'undo'})); bind('redo','click',()=>edit({op:'redo'}));
 bind('upload','change',async()=>{await uploadFiles($('upload').files);$('upload').value='';});
 bind('reference','change',async()=>{await uploadFiles($('reference').files,'reference');$('reference').value='';});
@@ -173,7 +184,7 @@ bind('apply-proposal','click',async()=>{if(proposal.version!==project.version) t
 bind('dismiss-proposal','click',()=>{proposal=null;render();});
 bind('preview','click',()=>startJob('export',{version:project.version,preview:true}));
 bind('export','click',()=>startJob('export',{version:project.version}));
-bind('save-style','click',()=>edit({op:'settings',style:{aspect:$('aspect').value,look:$('look').value,title:$('title').value,title_size:Number($('title-size').value),font:$('font').value,title_position:$('title-position').value,title_background:$('title-background').checked,music:$('music').value,source_volume:Number($('source-volume').value),music_volume:Number($('music-volume').value)}}));
+bind('save-style','click',()=>edit({op:'settings',style:{aspect:$('aspect').value,look:$('look').value,title:$('title').value,title_size:Number($('title-size').value),font:$('font').value,shot_seconds:Number($('shot-seconds').value),title_position:$('title-position').value,title_background:$('title-background').checked,music:$('music').value,source_volume:Number($('source-volume').value),music_volume:Number($('music-volume').value)}}));
 bind('save-shot','click',()=>edit({op:'shot',shot_id:selected,changes:{start:Number($('trim-start').value),end:Number($('trim-end').value),volume:Number($('shot-volume').value),caption:$('shot-caption').value}}));
 bind('shot-lock','click',()=>edit({op:'shot',shot_id:selected,changes:{locked:!project.timeline.find(s=>s.id===selected).locked}}));
 bind('split-shot','click',()=>{if(!playingShot||playingShot.id!==selected) throw new Error('Select this shot in the source monitor before splitting.');return edit({op:'split',shot_id:selected,at:$('viewer').currentTime});});
@@ -186,7 +197,7 @@ drop.addEventListener('dragover',event=>{event.preventDefault();drop.classList.a
 drop.addEventListener('dragleave',()=>drop.classList.remove('dragging'));
 drop.addEventListener('drop',event=>{event.preventDefault();drop.classList.remove('dragging');safe(()=>uploadFiles(event.dataTransfer.files));});
 document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){event.preventDefault();safe(()=>edit({op:event.shiftKey?'redo':'undo'}));}});
-for(const id of ['project-name','brief','aspect','look','title','title-size','font','title-position','title-background','music','source-volume','music-volume','trim-start','trim-end','shot-volume','shot-caption']) $(id).addEventListener('input',()=>{dirty.add(id);$('save-state').textContent='Unapplied changes';});
+for(const id of ['project-name','brief','aspect','look','title','title-size','font','shot-seconds','title-position','title-background','music','source-volume','music-volume','trim-start','trim-end','shot-volume','shot-caption']) $(id).addEventListener('input',()=>{dirty.add(id);$('discard').hidden=false;$('save-state').textContent='Unapplied changes';});
 async function boot() {
   config=await api('/config');
   $('use-model').disabled=!config.configured;
@@ -198,7 +209,7 @@ async function boot() {
   const initialJobs=await api('/jobs'); for(const job of initialJobs)lastJobs.set(job.id,job.status);
   const savedDraft=initialJobs.filter(job=>job.project_id===project.id&&job.name==='Draft edit'&&job.status==='completed'&&job.result.version===project.version).at(-1);
   if(savedDraft) {
-    proposal=savedDraft.result; $('rationale').textContent=proposal.rationale;
+    proposal=savedDraft.result; $('rationale').textContent=`${proposal.timeline.length} shots · ${time(proposal.duration)} calculated duration. ${proposal.mode==='model'?'Model explanation (review for accuracy): ':''}${proposal.rationale}`;
     $('proposal-shots').replaceChildren(...proposal.timeline.map(s=>el('p',`${project.assets[s.asset_id].name}: ${time(s.start)}–${time(s.end)}`)));
     $('proposal').hidden=false;
   }

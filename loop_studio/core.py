@@ -25,7 +25,7 @@ def number(value, low, high, label):
 
 DEFAULT_STYLE = {"aspect": "landscape", "look": "natural", "title": "", "title_size": 64,
                  "source_volume": 1.0, "music_volume": 0.18, "music": "none",
-                 "font": "sans", "title_position": "top-left", "title_background": False}
+                 "font": "sans", "shot_seconds": 3.0, "title_position": "top-left", "title_background": False}
 
 
 def validate(project):
@@ -70,6 +70,7 @@ def validate(project):
         raise ValueError("Unknown title position")
     if not isinstance(style.get("title_background", False), bool):
         raise ValueError("Title background must be a boolean")
+    number(style.get("shot_seconds", 3), .5, 8, "Suggested shot length")
     number(style["title_size"], 24, 120, "Title size")
     number(style["source_volume"], 0, 2, "Source volume")
     number(style["music_volume"], 0, 1, "Music volume")
@@ -94,6 +95,7 @@ class Store:
         with self.lock:
             project = json.loads((self.directory(pid) / "project.json").read_text())
             project["style"] = {**DEFAULT_STYLE, **project["style"]}
+            project.setdefault("notes", {})
             return project
 
     def save(self, project):
@@ -108,7 +110,7 @@ class Store:
         with self.lock:
             project = {"id": ident(), "name": str(name)[:100], "version": 0, "assets": {},
                        "timeline": [], "style": copy.deepcopy(DEFAULT_STYLE), "brief": "",
-                       "undo": [], "redo": [], "analysis": {}, "exports": []}
+                       "undo": [], "redo": [], "analysis": {}, "notes": {}, "exports": []}
             self.save(project)
             return project
 
@@ -122,7 +124,7 @@ class Store:
 
     @staticmethod
     def snapshot(project):
-        return copy.deepcopy({k: project[k] for k in ("name", "timeline", "style", "brief")})
+        return copy.deepcopy({k: project[k] for k in ("name", "timeline", "style", "brief", "notes")})
 
     def update(self, pid, version, operation):
         with self.lock:
@@ -188,6 +190,10 @@ class Store:
                 if not set(changes) <= {"start", "end", "locked", "caption", "volume"}:
                     raise ValueError("Unknown shot property")
                 shot.update(changes)
+        elif op == "notes":
+            if operation["asset_id"] not in p["assets"]:
+                raise ValueError("Unknown asset")
+            p["notes"][operation["asset_id"]] = str(operation["text"])[:2000]
         elif op == "settings":
             if "style" in operation:
                 if not set(operation["style"]) <= set(DEFAULT_STYLE):

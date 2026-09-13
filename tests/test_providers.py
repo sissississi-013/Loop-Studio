@@ -53,3 +53,22 @@ class ProviderTests(unittest.TestCase):
         asset=ingest(self.store,self.p['id'],path,'reference.png',kind='reference')
         self.assertTrue(asset['still'])
         self.assertEqual((self.store.directory(self.p['id'])/asset['original']).read_bytes(),original)
+
+    def test_user_notes_override_model_description_in_direction(self):
+        self.p=self.store.update(self.p['id'],self.p['version'],{'op':'notes','asset_id':'a','text':'A black swan, not a heron.'})
+        reply={'shots':[{'asset_id':'a','start':0,'end':3,'caption':''}],'rationale':'A bird'}
+        with patch('loop_studio.providers.model_json',return_value=reply) as model:
+            direct(self.store,self.p['id'],self.p,{'use_model':True},threading.Event(),lambda _:None)
+        self.assertIn('A black swan, not a heron.',model.call_args.args[0])
+
+    def test_reference_pace_comes_from_full_duration_scene_changes(self):
+        import subprocess
+        from loop_studio.providers import sample_asset
+        source=Path(self.tmp.name)/'reference-video.mp4'
+        subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','color=black:size=160x90:duration=2',
+                        '-f','lavfi','-i','color=white:size=160x90:duration=2','-f','lavfi','-i','color=black:size=160x90:duration=2',
+                        '-filter_complex','[0:v][1:v][2:v]concat=n=3:v=1:a=0[v]','-map','[v]',str(source)],check=True)
+        asset=ingest(self.store,self.p['id'],source,'reference-video.mp4',kind='reference')
+        result=sample_asset(self.store,self.p['id'],asset,threading.Event())
+        self.assertEqual(len(result['detected_cuts']),2)
+        self.assertAlmostEqual(result['reference_style']['shot_seconds'],2,delta=.1)

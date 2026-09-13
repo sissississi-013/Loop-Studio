@@ -2,12 +2,12 @@
 
 Status: active build. This is a new product checkout, not the completed hackathon prototype.
 
-- [ ] G1 — Full-duration import: up to ten clips / ten minutes; original bytes retained, separate full-duration proxies, rotation/audio handling, persistent projects.
-- [ ] G2 — One editable timeline: trim, reorder, remove, locks, undo/redo, optimistic conflict protection and recovery after restart.
-- [ ] G3 — Original-source 1080p export: aspect ratios, soundtrack/source audio, typography/captions, consistent preview/export, cancellation and errors.
-- [ ] G4 — Footage analysis and direction: full-duration candidate windows; timestamped model descriptions/highlights through a pluggable provider; local offline fallback explicitly labeled; editable proposal from a natural-language brief.
-- [ ] G5 — References and revisions: optional reference-derived editable style, targeted changes preserve locked shots, clear model and privacy controls.
-- [ ] G6 — Usable studio: sample onboarding without login or payment, upload → brief → draft → adjust → export; manual workflow fully functional without a model.
+- [x] G1 — Full-duration import: up to ten clips / ten minutes; original bytes retained, separate full-duration proxies, rotation/audio handling, persistent projects.
+- [x] G2 — One editable timeline: trim, reorder, remove, locks, undo/redo, optimistic conflict protection and recovery after restart.
+- [x] G3 — Original-source 1080p export: aspect ratios, soundtrack/source audio, typography/captions, consistent preview/export, cancellation and errors.
+- [x] G4 — Footage analysis and direction: full-duration candidate windows; timestamped model descriptions/highlights through a pluggable provider; local offline fallback explicitly labeled; editable proposal from a natural-language brief.
+- [x] G5 — References and revisions: optional reference-derived editable style, targeted changes preserve locked shots, clear model and privacy controls.
+- [x] G6 — Usable studio: sample onboarding without login or payment, upload → brief → draft → adjust → export; manual workflow fully functional without a model.
 - [ ] G7 — Release checks: automated integration tests, real media decode and audio checks, browser workflow, accessible layout, reproducible setup, license, limitations, repository updated.
 
 Human creator validation and competitive aesthetic benchmarks are follow-up research, not implementation gates that automated tests can satisfy.
@@ -36,3 +36,11 @@ Local server: port 8766, launched with /Users/sissi/usagi/.venv/bin/python (sess
 - Seventeen tests pass, covering original hashes, cuts beyond 12 seconds, audio across ten cuts, rotation, source limits, split/undo, locks, invalid model output, targeted revisions, references, byte-range serving, Host/Origin protection and restart status. JS syntax passes. GitHub Actions workflow added; remote run still needs checking after push.
 - Current server port 8766, isolated `.venv`, session 95736, model configured but unchecked by default. No cloud GPU jobs or paid API calls started.
 - Remaining release work: finish real-media/model and browser revision/export checks; final source audit and push; read GitHub CI results; record honest acceptance report and pause the build heartbeat if all implementation gates pass.
+
+## Release candidate
+
+Twenty-one local tests pass in the isolated environment, without warnings. Wheel builds and includes the web assets and MIT license. A raw HTTP reference-image upload returned 202 and completed; local browser revision/title/caption export produced 1920×1080 output. Reference scene-cut timing is checked on a three-scene fixture.
+
+Real model check: requested horse → person → bird ordering passed, but the model mislabeled the swan and incorrectly claimed a nine-second duration for an eight-second proposal. These errors are retained in ACCEPTANCE.md. Model explanations are explicitly reviewable, calculated duration is displayed separately, and corrected footage notes are saved/undoable and override descriptions in the direction context.
+
+No task model request or GPU job remains running. The local Ollama server may keep its own model cache until its normal unload timeout. The Loop Studio server is session 93177 at port 8766. New release candidate GitHub CI and final browser reference check are the remaining G7 items.

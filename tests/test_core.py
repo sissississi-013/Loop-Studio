@@ -67,3 +67,9 @@ class TimelineTests(unittest.TestCase):
         del self.p['assets']['11']
         self.p['assets']['0']['duration']=61
         with self.assertRaises(ValueError):validate(self.p)
+
+    def test_footage_corrections_are_saved_and_undoable(self):
+        self.edit(op='notes',asset_id='a',text='A black swan swimming.')
+        self.assertEqual(self.store.load(self.p['id'])['notes']['a'],'A black swan swimming.')
+        self.edit(op='undo')
+        self.assertNotIn('a',self.p['notes'])

@@ -42,18 +42,18 @@ Install and run your chosen model server separately. For Ollama, see its [docume
 
 Enable **Use my vision model** in the studio to opt in. Sampled contact sheets, footage descriptions and the brief may be sent to the configured endpoint; a remote endpoint means these leave your computer. Keys stay in the server environment and are never saved in project files. Disabled means no model network requests.
 
-Offline sampling evaluates brightness, edge detail and frame differences across the full duration. It **does not understand people, speech, story or aesthetics**. Offline drafting chooses one candidate per clip and recognizes fast/quick/energetic as pace hints. Model mode adds sampled visual descriptions and brief-based proposals; still-frame sampling cannot establish everything that happens between frames or in the audio.
+Offline sampling evaluates brightness, edge detail and frame differences across the full duration. It **does not understand people, speech, story or aesthetics**. Offline drafting selects non-overlapping scored windows from available cached analysis and recognizes fast/quick/energetic as pace hints. Model mode adds sampled visual descriptions and brief-based proposals. You can correct footage notes before drafting; still-frame sampling cannot establish everything that happens between frames or in the audio.
 
 ## Current boundaries
 
 - Ten source clips and ten minutes of source footage per project; 1 GB per upload. Draft length choices are suggestions; sparse or locked footage can produce a different duration.
 - Landscape 1920×1080, portrait 1080×1920 and square 1080×1080, 30 fps, H.264/AAC. Footage fits inside the chosen canvas; automatic subject crops, HDR mastering and color-managed professional delivery are not implemented.
 - Cuts, per-shot captions, an opening title, basic color looks and procedural soundtracks. No speech transcription, multilayer compositing, multicam, advanced transitions or keyframes yet.
-- Up to three reference images/videos can suggest an editable basic color look; exact pacing, typography and aesthetic transfer remain development work.
+- Up to three reference images/videos can suggest an editable basic color look. Reference videos also estimate shot length from scene changes; exact typography and aesthetic transfer remain development work.
 - Locks preserve shot contents and timeline position. Undo/redo retains the latest 100 edits. Exports save their timeline snapshot and remain associated with the version that produced them.
 - Jobs run one at a time, can be cancelled and report interrupted work after a server restart. Keep the local server running for jobs to finish.
 - This is a loopback-only, single-user development server, not a hardened multi-user hosting service.
-- Sample footage is generated test material, not evidence of aesthetic quality. Creator evaluation and common-footage competitor benchmarks have not been performed.
+- Sample footage is generated test material, not evidence of aesthetic quality. Creator evaluation and common-footage competitor benchmarks have not been performed. See [the acceptance report](ACCEPTANCE.md) for measured checks and model errors.
 
 ## Development
 

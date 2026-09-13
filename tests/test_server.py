@@ -29,8 +29,9 @@ class HTTPTests(unittest.TestCase):
         for headers in ({'Origin':'https://evil.example'},{'Host':'evil.example'},{'Sec-Fetch-Site':'cross-site'}):
             with self.assertRaises(urllib.error.HTTPError) as err:
                 self.request('/api/projects',{'name':'forbidden'},headers)
-            self.assertEqual(err.exception.code,403)
-        with self.assertRaises(urllib.error.HTTPError):self.request('/%2e%2e/AGENTS.md')
+            self.assertEqual(err.exception.code,403);err.exception.close()
+        with self.assertRaises(urllib.error.HTTPError) as err:self.request('/%2e%2e/AGENTS.md')
+        err.exception.close()
         with self.request('/api/projects') as response:self.assertEqual(json.load(response),[])
 
     def test_range_and_conflict(self):
@@ -42,7 +43,7 @@ class HTTPTests(unittest.TestCase):
         with self.request(f"/api/projects/{p['id']}/edit",{'version':0,'operation':{'op':'settings','name':'Edited'}}):pass
         with self.assertRaises(urllib.error.HTTPError) as err:
             self.request(f"/api/projects/{p['id']}/edit",{'version':0,'operation':{'op':'undo'}})
-        self.assertEqual(err.exception.code,409)
+        self.assertEqual(err.exception.code,409);err.exception.close()
 
     def test_restart_marks_interrupted_job(self):
         root=Path(self.tmp.name)/'separate';root.mkdir()
@@ -50,3 +51,14 @@ class HTTPTests(unittest.TestCase):
         jobs=Jobs(root)
         try:self.assertEqual(jobs.items['j']['status'],'failed')
         finally:jobs.close()
+
+    def test_queued_cancellation_runs_cleanup(self):
+        jobs=self.server.jobs
+        gate=threading.Event();started=threading.Event();cleaned=threading.Event()
+        def first(cancel,progress):
+            started.set();gate.wait(2);return {}
+        jobs.submit('p','first',first)
+        self.assertTrue(started.wait(1))
+        job=jobs.submit('p','second',lambda c,p:{},cleanup=cleaned.set)
+        jobs.cancel(job['id']);gate.set()
+        self.assertTrue(cleaned.wait(2))
