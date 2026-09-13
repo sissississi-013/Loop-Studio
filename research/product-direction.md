@@ -15,7 +15,7 @@ Saved September 13, 2026 after the user reported missing the hackathon submissio
 
 ## Research delivered
 
-[Market and MVP report](../research/open-studio-market-and-mvp.md) covers eleven YC companies (including infrastructure and historical comparators), ten additional products/projects, pricing friction, evidence limitations, aesthetics, current-code gaps and a proposed implementation sequence. Competitor capabilities are documented/advertised observations, not common-footage hands-on benchmark results.
+[Market and MVP report](market-and-mvp.md) covers eleven YC companies (including infrastructure and historical comparators), ten additional products/projects, pricing friction, evidence limitations, aesthetics, current-code gaps and a proposed implementation sequence. Competitor capabilities are documented/advertised observations, not common-footage hands-on benchmark results.
 
 The recommendation is a complete first-cut workflow: originals and proxies → temporal understanding → candidate moments → editable style/sequence plan → shared timeline → targeted revisions → original-quality export. Preserve the reliable parts of CutLoop while replacing hackathon limits and fragmented workflows.
 

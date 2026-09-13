@@ -41,12 +41,32 @@ def probe(path):
     duration = float(data.get("format", {}).get("duration", video.get("duration", 0)))
     if not math.isfinite(duration) or duration < .25:
         raise ValueError("Could not read a valid video duration")
-    return {"duration": duration, "width": video["width"], "height": video["height"],
+    rotation = float(video.get("tags", {}).get("rotate", 0))
+    for side in video.get("side_data_list", []):
+        if "rotation" in side:
+            rotation = float(side["rotation"])
+    width, height = video["width"], video["height"]
+    if round(rotation) % 180:
+        width, height = height, width
+    return {"duration": duration, "width": width, "height": height,
             "audio": any(s["codec_type"] == "audio" for s in data["streams"])}
 
 
 def ingest(store, pid, upload, name, cancel=None, kind="clip"):
-    meta = probe(upload)
+    still = False
+    if kind == "reference":
+        from PIL import Image
+        try:
+            with Image.open(upload) as picture:
+                if picture.format in ("JPEG", "PNG", "WEBP"):
+                    if picture.width * picture.height > 40_000_000:
+                        raise ValueError("Reference images are limited to 40 megapixels")
+                    meta = {"duration": 4.0, "width": picture.width, "height": picture.height, "audio": False}
+                    still = True
+        except (OSError, Image.DecompressionBombError):
+            pass
+    if not still:
+        meta = probe(upload)
     if meta["duration"] > 600:
         raise ValueError("A video must be at most ten minutes")
     aid = ident()
@@ -57,15 +77,22 @@ def ingest(store, pid, upload, name, cancel=None, kind="clip"):
         shutil.move(str(upload), original)
         with original.open("rb") as handle:
             digest = hashlib.file_digest(handle, "sha256").hexdigest()
-        run(["ffmpeg", "-v", "error", "-y", "-i", str(original), "-map", "0:v:0", "-map", "0:a:0?",
+        source = original
+        if still:
+            from PIL import Image, ImageOps
+            source = directory / "reference.png"
+            with Image.open(original) as picture:
+                ImageOps.exif_transpose(picture).convert("RGB").save(source)
+        inputs = ["-loop", "1", "-i", str(source), "-t", "4"] if still else ["-i", str(source)]
+        run(["ffmpeg", "-v", "error", "-y", *inputs, "-map", "0:v:0", "-map", "0:a:0?",
              "-vf", "scale=640:640:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1,fps=24",
              "-c:v", "libx264", "-preset", "veryfast", "-crf", "25", "-pix_fmt", "yuv420p",
              "-c:a", "aac", "-ac", "2", "-ar", "48000", "-movflags", "+faststart", str(directory / "proxy.mp4")], cancel)
-        run(["ffmpeg", "-v", "error", "-y", "-ss", str(min(meta["duration"] / 3, 2)), "-i", str(original),
+        run(["ffmpeg", "-v", "error", "-y", "-ss", str(min(meta["duration"] / 3, 2)), "-i", str(directory / "proxy.mp4"),
              "-frames:v", "1", "-vf", "scale=400:-2", str(directory / "poster.jpg")], cancel)
         with store.lock:
             p = store.load(pid)
-            asset = {"id": aid, "name": Path(name).name[:160], "kind": kind, **meta, "sha256": digest,
+            asset = {"id": aid, "name": Path(name).name[:160], "kind": kind, "still": still, **meta, "sha256": digest,
                      "original": f"media/{aid}/original", "proxy": f"media/{aid}/proxy.mp4", "poster": f"media/{aid}/poster.jpg"}
             p["assets"][aid] = asset
             validate(p)
@@ -82,8 +109,14 @@ LOOKS = {"natural": "null", "warm": "colorbalance=rs=.06:bs=-.04,eq=saturation=1
          "cool": "colorbalance=rs=-.03:bs=.06", "mono": "hue=s=0"}
 
 
-def font_path():
+def font_path(family="sans"):
     # Explicit system fallback; no font files are redistributed.
+    if family != "sans":
+        choices = {"serif": ("/System/Library/Fonts/Supplemental/Georgia.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf"),
+                   "mono": ("/System/Library/Fonts/Menlo.ttc", "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf")}
+        for path in choices.get(family, ()):
+            if Path(path).exists():
+                return path
     for candidate in ("/System/Library/Fonts/Supplemental/Arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
                       "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"):
         if Path(candidate).exists():
@@ -115,7 +148,7 @@ def export(store, pid, project, cancel=None, progress=lambda _: None, preview=Fa
             source = store.directory(pid) / asset["original"]
             seconds = round((shot["end"] - shot["start"]) * fps) / fps
             duration += seconds
-            out = directory / f"shot-{i}.mp4"
+            out = directory / f"shot-{i}.mov"
             filters = [f"scale={width}:{height}:force_original_aspect_ratio=decrease:force_divisible_by=2",
                        f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black", "setsar=1", f"fps={fps}", LOOKS[style["look"]]]
             title = style["title"] if i == 0 else ""
@@ -126,7 +159,7 @@ def export(store, pid, project, cancel=None, progress=lambda _: None, preview=Fa
             overlay_index = 1 if asset["audio"] else 2
             if title or caption:
                 overlay = directory / f"overlay-{i}.png"
-                text_overlay(overlay, width, height, title, caption, style["title_size"], SIZES[style["aspect"]][0])
+                text_overlay(overlay, width, height, title, caption, style["title_size"], SIZES[style["aspect"]][0], style)
                 args += ["-i", str(overlay)]
                 video_args = ["-filter_complex", f"[0:v]{','.join(filters)}[base];[base][{overlay_index}:v]overlay=0:0:format=auto[v]", "-map", "[v]"]
             else:
@@ -134,14 +167,14 @@ def export(store, pid, project, cancel=None, progress=lambda _: None, preview=Fa
             args += ["-t", str(seconds), *video_args, "-map", "0:a:0" if asset["audio"] else "1:a:0",
                      "-af", f"aresample=48000,apad,atrim=duration={seconds},asetpts=PTS-STARTPTS,volume={style['source_volume'] * shot.get('volume', 1)}",
                      "-c:v", "libx264", "-preset", "veryfast" if preview else "fast", "-crf", "24" if preview else "18",
-                     "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", str(out)]
+                     "-pix_fmt", "yuv420p", "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", str(out)]
             run(args, cancel)
             paths.append(out)
         listing = directory / "concat.txt"
         listing.write_text("\n".join(f"file '{p.name}'" for p in paths))
         joined = directory / "joined.mp4"
         run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(listing),
-             "-c", "copy", "-movflags", "+faststart", str(joined)], cancel)
+             "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(joined)], cancel)
         final = directory / "film.mp4"
         if style["music"] != "none":
             # Procedural music owned by the project: no downloaded soundtrack/license dependency.
@@ -169,32 +202,40 @@ def export(store, pid, project, cancel=None, progress=lambda _: None, preview=Fa
         raise
 
 
-def text_overlay(path, width, height, title, caption, title_size, base_width):
+def text_overlay(path, width, height, title, caption, title_size, base_width, style=None):
     from PIL import Image, ImageDraw, ImageFont
+    style = style or {}
     canvas = Image.new("RGBA", (width, height))
     draw = ImageDraw.Draw(canvas)
-    font = font_path()
-    if not font:
-        raise ValueError("Install DejaVu Sans or Arial to render text")
-    for text, relative_y, size in ((title, .15, title_size), (caption, .82, 42)):
+    for text, is_title, size in ((title, True, title_size), (caption, False, 42)):
         if not text:
             continue
+        font = font_path(style.get("font", "sans") if is_title else "sans")
+        if not font:
+            raise ValueError("Install DejaVu fonts or Arial to render text")
         size = max(10, round(size * width / base_width))
-        face = ImageFont.truetype(font, size)
-        # Wrap arbitrary text (including unbroken tokens) by measured pixel width.
-        lines, line = [], ""
-        for char in text:
-            if char == "\n" or (line and draw.textlength(line + char, font=face) > width * .86):
-                lines.append(line)
-                line = "" if char == "\n" else char
-            else:
-                line += char
-        lines.append(line)
-        content = "\n".join(lines)
-        box = draw.multiline_textbbox((0, 0), content, font=face, align="center", spacing=4)
-        text_width, text_height = box[2] - box[0], box[3] - box[1]
-        x = (width - text_width) / 2
-        y = min(height * relative_y, height * .95 - text_height)
-        draw.rounded_rectangle((x-10, y-6, x+text_width+10, y+text_height+10), radius=5, fill=(0, 0, 0, 95))
-        draw.multiline_text((x-box[0], y-box[1]), content, font=face, fill="white", align="center", spacing=4)
+        while True:
+            face = ImageFont.truetype(font, size)
+            lines, line = [], ""
+            for char in text:
+                if char == "\n" or (line and draw.textlength(line + char, font=face) > width * .84):
+                    lines.append(line)
+                    line = "" if char == "\n" else char
+                else:
+                    line += char
+            lines.append(line)
+            content = "\n".join(lines)
+            box = draw.multiline_textbbox((0, 0), content, font=face, spacing=4)
+            text_width, text_height = box[2] - box[0], box[3] - box[1]
+            if text_height <= height * .28 or size <= 10:
+                break
+            size -= 1
+        position = style.get("title_position", "top-left") if is_title else "bottom-center"
+        x = width * .08 if position.endswith("left") else (width - text_width) / 2
+        y = height * .13 if position.startswith("top") else height * .88 - text_height
+        align = "left" if position.endswith("left") else "center"
+        if not is_title or style.get("title_background", False):
+            draw.rounded_rectangle((x-10, y-6, x+text_width+10, y+text_height+10), radius=5, fill=(0, 0, 0, 95))
+        draw.multiline_text((x-box[0]+1, y-box[1]+2), content, font=face, fill=(0,0,0,150), align=align, spacing=4)
+        draw.multiline_text((x-box[0], y-box[1]), content, font=face, fill="white", align=align, spacing=4)
     canvas.save(path)

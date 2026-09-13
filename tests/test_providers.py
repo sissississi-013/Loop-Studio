@@ -1,0 +1,55 @@
+import copy
+import json
+import tempfile
+import threading
+import unittest
+from unittest.mock import patch
+from pathlib import Path
+from PIL import Image
+from loop_studio.core import Store
+from loop_studio.providers import direct, model_json
+from loop_studio.media import ingest
+
+
+class ProviderTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
+        self.store=Store(self.tmp.name);self.p=self.store.create()
+        self.p['assets']={'a':{'id':'a','duration':20,'kind':'clip'},'b':{'id':'b','duration':10,'kind':'clip'}}
+        self.p['analysis']={aid:{'mode':'model','description':'Fixture','candidates':[{'start':0,'end':3,'score':.7}]} for aid in self.p['assets']}
+        self.store.save(self.p)
+        for aid in ['a','b']:
+            self.p=self.store.update(self.p['id'],self.p['version'],{'op':'add','asset_id':aid,'start':0,'end':5})
+
+    def test_targeted_offline_revision_preserves_other_shots(self):
+        before=copy.deepcopy(self.p)
+        result=direct(self.store,self.p['id'],self.p,{'brief':'Make this shorter','target_shot_id':self.p['timeline'][0]['id']},threading.Event(),lambda _:None)
+        self.assertLess(result['timeline'][0]['end'],5)
+        self.assertEqual(result['timeline'][1],before['timeline'][1])
+        self.assertEqual(self.store.load(self.p['id']),before)
+
+    def test_model_cannot_change_untargeted_shots(self):
+        reply={'shots':[{'asset_id':'a','start':1,'end':3,'caption':'A detail'}],'rationale':'Trim the selected shot'}
+        with patch('loop_studio.providers.model_json',return_value=reply):
+            result=direct(self.store,self.p['id'],self.p,{'brief':'A detail','target_shot_id':self.p['timeline'][0]['id'],'use_model':True},threading.Event(),lambda _:None)
+        self.assertEqual(result['timeline'][1],self.p['timeline'][1])
+        self.assertEqual(result['timeline'][0]['id'],self.p['timeline'][0]['id'])
+
+    def test_invalid_model_ranges_leave_project_intact(self):
+        reply={'shots':[{'asset_id':'a','start':19,'end':100}], 'rationale':'Bad'}
+        with patch('loop_studio.providers.model_json',return_value=reply),self.assertRaises(ValueError):
+            direct(self.store,self.p['id'],self.p,{'use_model':True},threading.Event(),lambda _:None)
+        self.assertEqual(self.store.load(self.p['id']),self.p)
+
+    def test_locked_shot_is_preserved_in_full_draft(self):
+        self.p=self.store.update(self.p['id'],self.p['version'],{'op':'shot','shot_id':self.p['timeline'][1]['id'],'changes':{'locked':True}})
+        result=direct(self.store,self.p['id'],self.p,{'brief':'fast'},threading.Event(),lambda _:None)
+        self.assertEqual(result['timeline'][1],self.p['timeline'][1])
+
+    def test_reference_image_original_is_preserved(self):
+        path=Path(self.tmp.name)/'reference.png'
+        Image.new('RGB',(200,100),(180,110,80)).save(path)
+        original=path.read_bytes()
+        asset=ingest(self.store,self.p['id'],path,'reference.png',kind='reference')
+        self.assertTrue(asset['still'])
+        self.assertEqual((self.store.directory(self.p['id'])/asset['original']).read_bytes(),original)

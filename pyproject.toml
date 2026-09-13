@@ -15,3 +15,6 @@ loop-studio = "loop_studio.server:main"
 
 [tool.setuptools.package-data]
 loop_studio = ["web/*"]
+
+[tool.setuptools.packages.find]
+include = ["loop_studio*"]

@@ -2,7 +2,7 @@
 
 An open-source, local-first video editor: bring a few clips, describe a direction, review a proposed cut, and make it yours.
 
-**Status: active MVP development.** The manual editor and original-source export work; optional model direction is being validated. This is not yet a replacement for a full professional editor. See [implementation gates](BUILD_STATUS.md) and [the competitor research](research/market-and-mvp.md).
+**Status: active MVP development.** The manual editor, original-source export and optional local vision direction have passed initial integration checks. This is not yet a replacement for a full professional editor. See [implementation gates](BUILD_STATUS.md) and [the competitor research](research/market-and-mvp.md).
 
 ## Run locally
 
@@ -22,7 +22,7 @@ Open http://127.0.0.1:8766. No login, subscription, telemetry or model key is re
 1. Choose **Try with sample footage** or add your own clips.
 2. **Explore the footage** produces timestamped candidate windows.
 3. Enter a brief and choose **Make a first cut**. Review the proposal before applying it.
-4. Select timeline shots to trim, reorder, caption, adjust volume or lock them. Add an opening title, color look and optional procedural soundtrack.
+4. Select timeline shots to trim, reorder, caption, adjust volume or lock them. Add an opening title with editable typeface/placement, a color look and an optional procedural soundtrack.
 5. **Render preview** shows the actual composition. **Export film** renders from original footage at 1080p. The source monitor displays a lightweight proxy, without finishing effects.
 
 ## Optional models
@@ -32,6 +32,8 @@ The server accepts an OpenAI-compatible chat-completions endpoint with image inp
 ```sh
 export LOOP_MODEL_URL=http://localhost:11434/v1
 export LOOP_MODEL=qwen3-vl:8b
+# Optional for thinking models when supported by your endpoint:
+# export LOOP_MODEL_REASONING=none
 # For a remote provider, use its HTTPS /v1 base URL and set LOOP_MODEL_KEY.
 loop-studio
 ```
@@ -47,7 +49,7 @@ Offline sampling evaluates brightness, edge detail and frame differences across 
 - Ten source clips and ten minutes of source footage per project; 1 GB per upload. Draft length choices are suggestions; sparse or locked footage can produce a different duration.
 - Landscape 1920×1080, portrait 1080×1920 and square 1080×1080, 30 fps, H.264/AAC. Footage fits inside the chosen canvas; automatic subject crops, HDR mastering and color-managed professional delivery are not implemented.
 - Cuts, per-shot captions, an opening title, basic color looks and procedural soundtracks. No speech transcription, multilayer compositing, multicam, advanced transitions or keyframes yet.
-- Reference videos can suggest an editable basic color look; exact pacing, typography and aesthetic transfer remain development work.
+- Up to three reference images/videos can suggest an editable basic color look; exact pacing, typography and aesthetic transfer remain development work.
 - Locks preserve shot contents and timeline position. Undo/redo retains the latest 100 edits. Exports save their timeline snapshot and remain associated with the version that produced them.
 - Jobs run one at a time, can be cancelled and report interrupted work after a server restart. Keep the local server running for jobs to finish.
 - This is a loopback-only, single-user development server, not a hardened multi-user hosting service.

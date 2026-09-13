@@ -25,3 +25,14 @@ Implemented: immutable originals and separate full-duration proxies; versioned s
 Verification so far: five automated tests pass, including a cut at 13–14.5 seconds from a 15-second source, decoded 1920×1080 export with non-silent audio, exact original hash preservation, atomic invalid-trim rejection, locks, conflicts and undo recovery. JS syntax passes. Browser sample import and offline draft creation work. Real vision endpoint, reference/style revisions, ten-clip limits and broader UI/export QA remain unfinished; do not mark all gates complete.
 
 Local server: port 8766, launched with /Users/sissi/usagi/.venv/bin/python (session 63621). New checkout packaging must still be verified in its own fresh environment.
+
+## Milestone 2 — local model and revision checks
+
+- Fresh isolated `.venv` installs successfully; packaging discovery was fixed after the initial install check caught an error.
+- Added still-image references, source-range splitting, selected-shot revisions, typeface/title placement/background controls, and protection against discarding unapplied form changes.
+- Local Ollama `gemma4:12b` vision endpoint is available. A simple vision request passed. A full three-clip analysis plus requested blue → tan → test-pattern order passed, 15-second valid proposal, 205.25 seconds total. Initial thinking-enabled call timed out; `LOOP_MODEL_REASONING=none` is used locally. This is pretrained inference, not training or aesthetic validation.
+- Static clips may return no highlights; preserved visual descriptions now explicitly label signal-selected fallback windows. Model failure does not alter the timeline.
+- Real-media three-shot 9-second 1920×1080 export passed; source files remain local and ignored. A real-media model check is running. These historical research clips are not included as public onboarding media.
+- Seventeen tests pass, covering original hashes, cuts beyond 12 seconds, audio across ten cuts, rotation, source limits, split/undo, locks, invalid model output, targeted revisions, references, byte-range serving, Host/Origin protection and restart status. JS syntax passes. GitHub Actions workflow added; remote run still needs checking after push.
+- Current server port 8766, isolated `.venv`, session 95736, model configured but unchecked by default. No cloud GPU jobs or paid API calls started.
+- Remaining release work: finish real-media/model and browser revision/export checks; final source audit and push; read GitHub CI results; record honest acceptance report and pause the build heartbeat if all implementation gates pass.

@@ -50,3 +50,20 @@ class TimelineTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.edit(op='shot', shot_id=self.p['timeline'][0]['id'], changes={'start': start})
         self.assertEqual(self.store.load(self.p['id']), original)
+
+    def test_split_preserves_source_ranges_and_undo(self):
+        self.edit(op='add', asset_id='a', start=10, end=18)
+        self.edit(op='split',shot_id=self.p['timeline'][0]['id'],at=13)
+        self.assertEqual([(s['start'],s['end']) for s in self.p['timeline']],[(10,13),(13,18)])
+        self.edit(op='undo')
+        self.assertEqual([(s['start'],s['end']) for s in self.p['timeline']],[(10,18)])
+
+    def test_source_count_and_duration_limits(self):
+        from loop_studio.core import validate
+        self.p['assets']={str(i):{'id':str(i),'duration':60} for i in range(10)}
+        validate(self.p)
+        self.p['assets']['11']={'id':'11','duration':1}
+        with self.assertRaises(ValueError):validate(self.p)
+        del self.p['assets']['11']
+        self.p['assets']['0']['duration']=61
+        with self.assertRaises(ValueError):validate(self.p)

@@ -24,7 +24,8 @@ def number(value, low, high, label):
 
 
 DEFAULT_STYLE = {"aspect": "landscape", "look": "natural", "title": "", "title_size": 64,
-                 "source_volume": 1.0, "music_volume": 0.18, "music": "none"}
+                 "source_volume": 1.0, "music_volume": 0.18, "music": "none",
+                 "font": "sans", "title_position": "top-left", "title_background": False}
 
 
 def validate(project):
@@ -33,6 +34,8 @@ def validate(project):
         raise ValueError("Projects support up to ten video clips")
     if sum(a["duration"] for a in assets.values() if a.get("kind", "clip") == "clip") > 600.1:
         raise ValueError("Projects support ten minutes of source footage")
+    if len([a for a in assets.values() if a.get("kind") == "reference"]) > 3:
+        raise ValueError("Projects support up to three references")
     seen = set()
     for shot in project["timeline"]:
         if shot["id"] in seen:
@@ -61,6 +64,12 @@ def validate(project):
         raise ValueError("Unknown color look")
     if style["music"] not in ("none", "ambient", "pulse"):
         raise ValueError("Unknown soundtrack")
+    if style.get("font", "sans") not in ("sans", "serif", "mono"):
+        raise ValueError("Unknown typeface")
+    if style.get("title_position", "top-left") not in ("top-left", "top-center", "bottom-left", "bottom-center"):
+        raise ValueError("Unknown title position")
+    if not isinstance(style.get("title_background", False), bool):
+        raise ValueError("Title background must be a boolean")
     number(style["title_size"], 24, 120, "Title size")
     number(style["source_volume"], 0, 2, "Source volume")
     number(style["music_volume"], 0, 1, "Music volume")
@@ -83,7 +92,9 @@ class Store:
 
     def load(self, pid):
         with self.lock:
-            return json.loads((self.directory(pid) / "project.json").read_text())
+            project = json.loads((self.directory(pid) / "project.json").read_text())
+            project["style"] = {**DEFAULT_STYLE, **project["style"]}
+            return project
 
     def save(self, project):
         directory = self.directory(project["id"])
@@ -128,8 +139,13 @@ class Store:
                 p.update(p[source].pop())
             else:
                 self.apply(p, operation)
+                for index, shot in enumerate(before["timeline"]):
+                    unlocking = (op == "shot" and operation.get("shot_id") == shot["id"] and operation.get("changes") == {"locked": False})
+                    if shot.get("locked") and not unlocking and (index >= len(p["timeline"]) or p["timeline"][index] != shot):
+                        raise ValueError("This edit would change a locked shot or its timeline position")
                 p["undo"] = (p["undo"] + [before])[-100:]
                 p["redo"] = []
+            p["style"] = {**DEFAULT_STYLE, **p["style"]}
             validate(p)
             p["version"] += 1
             self.save(p)
@@ -144,7 +160,7 @@ class Store:
             p["timeline"].append({"id": ident(), "asset_id": asset["id"], "start": operation.get("start", 0),
                                   "end": operation.get("end", asset["duration"]), "locked": False,
                                   "caption": "", "volume": 1.0})
-        elif op in ("shot", "remove", "move"):
+        elif op in ("shot", "remove", "move", "split"):
             index = next((i for i, s in enumerate(p["timeline"]) if s["id"] == operation["shot_id"]), None)
             if index is None:
                 raise ValueError("Unknown shot")
@@ -153,6 +169,12 @@ class Store:
                 raise ValueError("Unlock this shot before changing it")
             if op == "remove":
                 p["timeline"].pop(index)
+            elif op == "split":
+                at = number(operation["at"], shot["start"] + .25, shot["end"] - .25, "Split time")
+                right = copy.deepcopy(shot)
+                right.update(id=ident(), start=at)
+                shot["end"] = at
+                p["timeline"].insert(index + 1, right)
             elif op == "move":
                 to = operation["index"]
                 if not isinstance(to, int) or not 0 <= to < len(p["timeline"]):

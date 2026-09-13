@@ -33,7 +33,7 @@ class Jobs:
         tmp.write_text(json.dumps(self.items))
         tmp.replace(self.path)
 
-    def submit(self, pid, name, fn):
+    def submit(self, pid, name, fn, cleanup=None):
         with self.lock:
             if sum(j['status'] in ('queued', 'running') for j in self.items.values()) >= 12:
                 raise ValueError('Job queue is full. Wait for current operations.')
@@ -59,6 +59,8 @@ class Jobs:
                 with self.lock:
                     self.items[jid].update(status='cancelled' if cancel.is_set() else 'failed', message=str(exc)[:1800])
             finally:
+                if cleanup:
+                    cleanup()
                 with self.lock:
                     self.cancels.pop(jid, None)
                     self.save()
@@ -229,7 +231,7 @@ def make_server(root, port):
                                 return media.ingest(store, pid, upload, name, cancel, kind)
                             finally:
                                 upload.unlink(missing_ok=True)
-                        return self.json(jobs.submit(pid, 'Import', process), 202)
+                        return self.json(jobs.submit(pid, 'Import', process, lambda: upload.unlink(missing_ok=True)), 202)
                     except BaseException:
                         upload.unlink(missing_ok=True)
                         raise

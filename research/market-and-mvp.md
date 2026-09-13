@@ -1,3 +1,5 @@
+> Research snapshot prepared before the Loop Studio product build. For current shipped functionality, see [the README](../README.md).
+
 # Open Video Studio: Market and Product Strategy
 
 ## Recommendation
@@ -415,7 +417,7 @@ All public sources below were accessed September 13, 2026. Unless a publication 
 40. Blackmagic Design. [DaVinci Resolve training](https://www.blackmagicdesign.com/ca/products/davinciresolve/training). Editing, color and sound training resources.
 <a id="source-41"></a>
 
-41. CutLoop workspace, local source checkpoint `bd6b3e0`: [README](../README.md), [Studio import](../cutloop/studio.py), [Reel implementation](../cutloop/reel.py), [Reel director](../cutloop/reel_director.py), [Attributions](../ATTRIBUTIONS.md), [package dependencies](../pyproject.toml). Private/local access; no public repository implied.
+41. Historical CutLoop workspace, local source checkpoint `bd6b3e0`: README, studio import, reel implementation, reel director, attributions and package dependencies were inspected locally. This historical source is not included in the new Loop Studio repository. These observations describe the prototype before the product build, not the current implementation.
 <a id="source-42"></a>
 
 42. Bryan Wang et al. [LAVE: LLM-Powered Agent Assistance and Language Augmentation for Video Editing](https://arxiv.org/abs/2402.10294), February 15, 2024; IUI 2024. Agent plus direct editing, N=8.
