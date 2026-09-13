@@ -15,9 +15,9 @@ Local import → full-duration proxy → timestamped candidate windows → brief
 
 ## Verification
 
-The test suite covers original hash preservation; an export trimmed at 13–14.5 seconds from a 15-second source; audio presence and full decode; no accumulated audio padding across ten cuts; rotated footage; clip count/duration limits; split/undo; locks and conflicts; malformed model ranges; scoped revisions; original reference images; reference cut timing; corrected notes; HTTP byte ranges and access checks; queued cancellation cleanup; restart recovery.
+Twenty-one tests pass locally and on [GitHub Linux CI](https://github.com/sissississi-013/Loop-Studio/actions/runs/34790627993) for code commit `bf87c1d`. The test suite covers original hash preservation; an export trimmed at 13–14.5 seconds from a 15-second source; audio presence and full decode; no accumulated audio padding across ten cuts; rotated footage; clip count/duration limits; split/undo; locks and conflicts; malformed model ranges; scoped revisions; original reference images; reference cut timing; corrected notes; HTTP byte ranges and access checks; queued cancellation cleanup; restart recovery.
 
-A fresh isolated Python environment installed the package. Browser checks exercised sample creation, draft generation/application, locks, captions, a targeted shorter-shot revision, preview and a new 1920×1080 export. The layout was inspected at the narrow in-app browser width. This is not a formal accessibility audit or an exhaustive browser/device matrix.
+A fresh isolated Python environment installed the package. Browser checks exercised sample creation, draft generation/application, locks, captions, a targeted shorter-shot revision, preview and a new 1920×1080 export. Reference analysis/application and saving a corrected footage description were also verified through the UI. The layout was inspected at the narrow in-app browser width. This is not a formal accessibility audit or an exhaustive browser/device matrix.
 
 A local real-media edit with three historical research clips rendered to a 9.0-second 1920×1080 MP4 with audio. The opening frame was visually inspected. These source clips and outputs are kept outside Git; they are not part of the public sample pack. Procedural sample clips are test material, not an aesthetic showcase.
 

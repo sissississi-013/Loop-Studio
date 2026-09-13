@@ -1,6 +1,6 @@
 # Implementation gates
 
-Status: active build. This is a new product checkout, not the completed hackathon prototype.
+Status: initial MVP implementation gates complete. This is a functional local alpha; creator validation and broader product scope remain follow-up work. See ACCEPTANCE.md.
 
 - [x] G1 — Full-duration import: up to ten clips / ten minutes; original bytes retained, separate full-duration proxies, rotation/audio handling, persistent projects.
 - [x] G2 — One editable timeline: trim, reorder, remove, locks, undo/redo, optimistic conflict protection and recovery after restart.
@@ -8,7 +8,7 @@ Status: active build. This is a new product checkout, not the completed hackatho
 - [x] G4 — Footage analysis and direction: full-duration candidate windows; timestamped model descriptions/highlights through a pluggable provider; local offline fallback explicitly labeled; editable proposal from a natural-language brief.
 - [x] G5 — References and revisions: optional reference-derived editable style, targeted changes preserve locked shots, clear model and privacy controls.
 - [x] G6 — Usable studio: sample onboarding without login or payment, upload → brief → draft → adjust → export; manual workflow fully functional without a model.
-- [ ] G7 — Release checks: automated integration tests, real media decode and audio checks, browser workflow, accessible layout, reproducible setup, license, limitations, repository updated.
+- [x] G7 — Release checks: automated integration tests, real media decode and audio checks, browser workflow, accessible layout, reproducible setup, license, limitations, repository updated.
 
 Human creator validation and competitive aesthetic benchmarks are follow-up research, not implementation gates that automated tests can satisfy.
 
@@ -16,7 +16,7 @@ Human creator validation and competitive aesthetic benchmarks are follow-up rese
 
 Repository: /Users/sissi/Loop-Studio. Continue the first unfinished gate. Server port 8766 (old demo uses 8765). Runtime data belongs outside tracked source in `.loop-studio/`. No model training is required for this MVP. No new GPU jobs have been started for this product.
 
-Automation: complete-loop-studio-mvp, active, every 30 minutes. The prior cutloop-overnight-build automation is paused and must remain so.
+Automation: complete-loop-studio-mvp, now paused after completion (previously every 30 minutes). The prior cutloop-overnight-build automation is paused and must remain so.
 
 ## Milestone 1 — September 13, 2026
 
@@ -44,3 +44,11 @@ Twenty-one local tests pass in the isolated environment, without warnings. Wheel
 Real model check: requested horse → person → bird ordering passed, but the model mislabeled the swan and incorrectly claimed a nine-second duration for an eight-second proposal. These errors are retained in ACCEPTANCE.md. Model explanations are explicitly reviewable, calculated duration is displayed separately, and corrected footage notes are saved/undoable and override descriptions in the direction context.
 
 No task model request or GPU job remains running. The local Ollama server may keep its own model cache until its normal unload timeout. The Loop Studio server is session 93177 at port 8766. New release candidate GitHub CI and final browser reference check are the remaining G7 items.
+
+## Completed implementation gate
+
+All seven scoped implementation gates passed. Code commit `bf87c1d5299d3f9fa66e5fcb5aa73bfb918c3f5a` passed GitHub Linux CI: https://github.com/sissississi-013/Loop-Studio/actions/runs/34790627993. Twenty-one local tests also pass. Browser reference import/analysis/application changed the color look as expected, and a model footage note was corrected and saved through the UI. Real-footage preview was visually inspected with the updated title placement.
+
+The heartbeat `complete-loop-studio-mvp` is now PAUSED at its implementation completion gate. Do not automatically restart or extend it into an endless polishing loop. The original hackathon heartbeat remains paused. Follow new user requests normally. No model request or task GPU job is running. The editor remains available on port 8766, session 93177.
+
+This completion means the defined local alpha workflow is implemented and checked. It does not establish aesthetic superiority, accurate understanding of every clip, production hosting readiness, or parity with every competitor. The known model errors and product limits are explicitly recorded in ACCEPTANCE.md.
