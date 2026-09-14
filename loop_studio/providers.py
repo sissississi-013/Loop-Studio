@@ -230,7 +230,7 @@ def direct(store, pid, project, data, cancel, progress):
                 end = min(asset['duration'], start+length)
                 score = sum(max(0, min(end,c['end'])-max(start,c['start']))*c['score'] for c in highlights)
                 ranked.append((score, round(start,3), round(end,3)))
-            windows = [(start,end) for _,start,end in sorted(ranked, reverse=True)[:10]]
+            windows = sorted((start,end) for _,start,end in sorted(ranked, reverse=True)[:10])
             if target_shot and target_shot['asset_id']==asset['id']:
                 start, end = target_shot['start'], target_shot['end']
                 windows = [(start,end),(start,start+max(.25,(end-start)*.7)),(start,min(asset['duration'],end+1))]+windows
@@ -269,6 +269,10 @@ def direct(store, pid, project, data, cancel, progress):
             for i, shot in enumerate(timeline):
                 if any(shot['asset_id']==other['asset_id'] and min(shot['end'],other['end'])-max(shot['start'],other['start'])>.01 for other in timeline[:i]):
                     raise InvalidProposal('This plan repeats source footage. Choose distinct non-overlapping segments, using each segment once.',reply)
+            if not re.search(r'\b(reverse|backwards?|flashback|nonlinear)\b', brief, re.I):
+                for previous, shot in zip(timeline,timeline[1:]):
+                    if shot['asset_id']==previous['asset_id'] and shot['start'] < previous['start']:
+                        raise InvalidProposal('Consecutive shots from the same source jump backwards in time. Keep each consecutive source sequence chronological unless requested otherwise.',reply)
         rationale = str(reply.get('rationale', 'Model proposal'))[:2000]
     else:
         # Deliberately limited offline brief grammar, exposed in the UI and docs.

@@ -102,3 +102,8 @@ class ProviderTests(unittest.TestCase):
         with patch('loop_studio.providers.model_json',return_value={'shots':[{'segment':0},{'segment':0}]}):
             with self.assertRaisesRegex(ValueError,'repeats source footage'):
                 direct(self.store,self.p['id'],self.p,{'use_model':True},threading.Event(),lambda _:None)
+
+    def test_consecutive_source_shots_do_not_jump_backwards_unrequested(self):
+        with patch('loop_studio.providers.model_json',return_value={'shots':[{'segment':1},{'segment':0}]}):
+            with self.assertRaisesRegex(ValueError,'jump backwards'):
+                direct(self.store,self.p['id'],self.p,{'use_model':True},threading.Event(),lambda _:None)

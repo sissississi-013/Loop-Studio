@@ -17,7 +17,7 @@ The user asked for a better process. This pass evaluates footage → playable dr
 
 Used copies of three local clips totaling 10.2 seconds. The user's original project and footage were preserved. Cached gemma4:12b descriptions were reused; nemotron-3-nano:4b planned locally.
 
-Observed failures drove fixes: the large planner timed out; a lighter planner invented out-of-range trims; a first segment-based draft was only two seconds; enlarged candidates overlapped. The final pipeline uses distinct validated ranges and duration checks. A final eight-second request rendered to **8.0 seconds in 17.08 seconds**, with no overlapping ranges. Frames and full video decode were checked. No semantic accuracy or aesthetic score is implied.
+Observed failures drove fixes: the large planner timed out; a lighter planner invented out-of-range trims; a first segment-based draft was only two seconds; enlarged candidates overlapped. The final pipeline uses distinct validated ranges and duration checks. A final eight-second request rendered to **8.0 seconds in 29.94 seconds**, with no overlapping ranges. A subsequent sequencing review caught an unrequested backward jump between adjacent shots from the same source. Candidates now appear chronologically and such jumps are rejected with a bounded repair. The final rerun retained chronological source progression. Frames and full video decode were checked. No semantic accuracy or aesthetic score is implied.
 
 Browser checks covered current/draft comparison, asking for a shorter opening, keeping, reload and 1080p export. The focused offline revision took 2.3 seconds and changed only the opening. The kept timeline equaled the reviewed proposal. That intermediate export was 1920×1080 with audio. Later cumulative-frame timing fixes passed an integration check using ten fractional-frame cuts.
 
@@ -35,7 +35,7 @@ An unsupported offline sunset instruction failed explicitly, leaving the edit in
 
 ## Verification and remaining limits
 
-Thirty-six automated tests pass locally, including source/lock safety, reference analysis inside drafting, persisted explicit finishing, draft-style preservation during revision, duplicate segment rejection, bounded repair, duration budgets and fractional-frame export timing. JS syntax and repository whitespace checks pass. CI is checked after publishing this milestone.
+Thirty-seven automated tests pass locally, including source/lock safety, reference analysis inside drafting, persisted explicit finishing, draft-style preservation during revision, duplicate segment rejection, bounded repair, duration budgets and fractional-frame export timing. JS syntax and repository whitespace checks pass. The first workflow commit passed GitHub Linux CI; the final sequencing follow-up is checked after publishing.
 
 The films and evidence stay in the ignored local data directory. No cloud compute or paid model calls were used. Models still mislabel footage and may produce weak sequencing. Sampled stills do not provide continuous motion/audio understanding. Music is a simple procedural bed, not a professional score or beat-matched edit. Reference handling is basic color/cut timing, not aesthetic transfer. Human review and common-footage comparisons remain necessary.
 

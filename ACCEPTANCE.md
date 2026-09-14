@@ -4,7 +4,7 @@ September 13, 2026. This report distinguishes working implementation from output
 
 ## Workflow refinement after user feedback
 
-The initial alpha was rejected as insufficient. The new process is **Make my film → watch/compare → revise → keep → export**, with cached analysis, reference processing, explicit style preservation, validated segment selection and bounded repair. Read [the actual review cases](WORKFLOW_REVIEW.md) for failures, measured timings and limits. Thirty-six tests pass locally for this pass; the older results below are historical. These checks do not establish creator satisfaction.
+The initial alpha was rejected as insufficient. The new process is **Make my film → watch/compare → revise → keep → export**, with cached analysis, reference processing, explicit style preservation, validated segment selection and bounded repair. Read [the actual review cases](WORKFLOW_REVIEW.md) for failures, measured timings and limits. Thirty-seven tests pass locally for this pass; the older results below are historical. These checks do not establish creator satisfaction.
 
 ## Implemented workflow
 
