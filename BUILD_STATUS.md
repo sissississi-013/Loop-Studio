@@ -2,7 +2,7 @@
 
 The user rejected the first alpha. The subsequent workflow pass is implemented and exercised on three concrete review cases; see WORKFLOW_REVIEW.md. This does not establish user acceptance or professional output quality.
 
-Current server: port 8766, session 43145. Local vision gemma4:12b; planner nemotron-3-nano:4b; reasoning disabled. Final real-footage draft: eight seconds, 29.94 seconds pipeline time, no repeated source ranges. Thirty-seven tests pass locally. Publish and verify CI before pausing the bounded review heartbeat. Runtime evidence remains ignored under .loop-studio/workflow-evidence. The original user project is unchanged.
+Current server: port 8766, session 43145. Local vision gemma4:12b; planner nemotron-3-nano:4b; reasoning disabled. Final real-footage draft: eight seconds, 29.94 seconds pipeline time, no repeated source ranges. Thirty-seven tests pass locally. Code commit 72f958e passed GitHub Linux CI: https://github.com/sissississi-013/Loop-Studio/actions/runs/34798787019. The bounded workflow review heartbeat is now paused for user review. No jobs remain running. Runtime evidence remains ignored under .loop-studio/workflow-evidence. The original user project is unchanged.
 
 The historical implementation-completion entries below describe the first alpha and must not override this current status.
 

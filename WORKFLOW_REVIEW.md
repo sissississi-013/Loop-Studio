@@ -35,8 +35,8 @@ An unsupported offline sunset instruction failed explicitly, leaving the edit in
 
 ## Verification and remaining limits
 
-Thirty-seven automated tests pass locally, including source/lock safety, reference analysis inside drafting, persisted explicit finishing, draft-style preservation during revision, duplicate segment rejection, bounded repair, duration budgets and fractional-frame export timing. JS syntax and repository whitespace checks pass. The first workflow commit passed GitHub Linux CI; the final sequencing follow-up is checked after publishing.
+Thirty-seven automated tests pass locally, including source/lock safety, reference analysis inside drafting, persisted explicit finishing, draft-style preservation during revision, duplicate segment rejection, bounded repair, duration budgets and fractional-frame export timing. JS syntax and repository whitespace checks pass. Both workflow commits passed GitHub Linux CI, including the [final sequencing follow-up](https://github.com/sissississi-013/Loop-Studio/actions/runs/34798787019). The final eight-second film was kept and exported at 1920×1080 with audio; full decode passed.
 
 The films and evidence stay in the ignored local data directory. No cloud compute or paid model calls were used. Models still mislabel footage and may produce weak sequencing. Sampled stills do not provide continuous motion/audio understanding. Music is a simple procedural bed, not a professional score or beat-matched edit. Reference handling is basic color/cut timing, not aesthetic transfer. Human review and common-footage comparisons remain necessary.
 
-This is a reviewable workflow improvement, not proof that the user is satisfied. Once the published checks finish, pause this bounded review loop for user review rather than silently treating the entire product vision as complete.
+This is a reviewable workflow improvement, not proof that the user is satisfied. The published code checks passed and this bounded review loop is paused for user review; the entire product vision is not declared complete.
