@@ -3,3 +3,4 @@
 .header-actions button{white-space:nowrap}.track-row{position:relative}.timeline-shot{min-width:0}#timeline-playhead{position:absolute;top:0;bottom:0;left:71px;width:1px;background:#e2f4e6;z-index:2;pointer-events:none}#timeline-playhead:before{content:'';position:absolute;left:-4px;top:0;border-top:6px solid #e2f4e6;border-left:4px solid transparent;border-right:4px solid transparent}#timeline-ruler{cursor:crosshair}
 
 #effects-pane label{display:block;font-size:11px;margin:16px 0 6px}#effects-pane select{margin-top:8px}.effects-title{font-size:24px;font-weight:400;letter-spacing:-1px}.inspector-tabs button{padding:10px 12px}
+.brand img.mark{object-fit:contain;vertical-align:middle;flex-shrink:0}

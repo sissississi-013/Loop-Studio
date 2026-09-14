@@ -1,3 +1,9 @@
+# Current work — logo and live ASCII motion
+
+Installed a generated mint film-loop logo in the landing page, editor and favicon. Added a rotating ASCII ribbon, three character-lab modes, speed control and an original animated light-trail background inspired by the Are.na references documented in BRAND_REFERENCES.md. The hero and lab pause independently and respect reduced-motion preferences with explicit playback overrides.
+
+Verification: 39 tests pass. Browser motion checks confirm changing frames, independent pauses, reduced-motion startup and manual playback. Landing and editor logos loaded at 390px with no horizontal overflow; desktop landing/lab and mobile screenshots were visually reviewed. No footage or project data was modified. Previous heartbeat remains paused.
+
 # Current work — dark studio, landing page and ASCII
 
 The requested Moonshot-inspired visual direction is implemented with original ASCII art, a separate landing page at `/`, and an editing workspace at `/studio`. The editor has a persistent timeline, Inspector/Director/ASCII tabs, timeline zoom, scrubbing and drag reorder. ASCII monochrome/phosphor treatments render into the actual film. See DESIGN_NOTES.md.
