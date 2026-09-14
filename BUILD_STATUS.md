@@ -1,3 +1,13 @@
+# Current work — dark studio, landing page and ASCII
+
+The requested Moonshot-inspired visual direction is implemented with original ASCII art, a separate landing page at `/`, and an editing workspace at `/studio`. The editor has a persistent timeline, Inspector/Director/ASCII tabs, timeline zoom, scrubbing and drag reorder. ASCII monochrome/phosphor treatments render into the actual film. See DESIGN_NOTES.md.
+
+Current local server: port 8766, session 68324.
+
+Verification: 39 tests pass locally, including ASCII video/audio export, original hash preservation, undo and invalid settings. Real eight-second ASCII footage exported at 1920×1080 with audio. Browser checks covered landing navigation, character modes/pause, shot inspection, zoom and effect preview/export. Both pages were inspected at desktop and 390×844 mobile sizes with no horizontal overflow. Publish and check CI for this milestone. Private footage and screenshots remain ignored; the original user project was not edited.
+
+The previous bounded workflow heartbeat remains paused; this is the subsequent user-requested design implementation.
+
 # Current work — workflow refinement ready for review
 
 The user rejected the first alpha. The subsequent workflow pass is implemented and exercised on three concrete review cases; see WORKFLOW_REVIEW.md. This does not establish user acceptance or professional output quality.

@@ -25,7 +25,7 @@ def number(value, low, high, label):
 
 DEFAULT_STYLE = {"aspect": "landscape", "look": "natural", "title": "", "title_size": 64,
                  "source_volume": 1.0, "music_volume": 0.18, "music": "none",
-                 "font": "sans", "shot_seconds": 3.0, "title_position": "top-left", "title_background": False}
+                 "ascii_mode": "off", "ascii_columns": 80, "font": "sans", "shot_seconds": 3.0, "title_position": "top-left", "title_background": False}
 
 
 def validate(project):
@@ -58,6 +58,9 @@ def validate(project):
     if sum(s["end"] - s["start"] for s in project["timeline"]) > 600.1:
         raise ValueError("Timeline is limited to ten minutes")
     style = project["style"]
+    if style.get("ascii_mode", "off") not in ("off", "mono", "green"):
+        raise ValueError("Unknown ASCII effect")
+    number(style.get("ascii_columns", 80), 40, 120, "ASCII columns")
     if style["aspect"] not in ("landscape", "portrait", "square"):
         raise ValueError("Unknown aspect ratio")
     if style["look"] not in ("natural", "warm", "cool", "mono"):

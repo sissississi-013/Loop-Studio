@@ -151,12 +151,19 @@ def export(store, pid, project, cancel=None, progress=lambda _: None, preview=Fa
             timeline_time += shot["end"] - shot["start"]
             seconds = (round(timeline_time * fps) - round(duration * fps)) / fps
             duration += seconds
+            seek = shot["start"]
+            if style.get("ascii_mode", "off") != "off":
+                from .ascii_effect import render_ascii
+                progress(f"Drawing ASCII frames for shot {i+1}")
+                ascii_path = directory / f"ascii-{i}.mov"
+                render_ascii(source, ascii_path, seek, seconds, style.get("ascii_columns",80), style['ascii_mode']=='green', cancel, asset['width']/asset['height'])
+                source, seek = ascii_path, 0
             out = directory / f"shot-{i}.mov"
             filters = [f"scale={width}:{height}:force_original_aspect_ratio=decrease:force_divisible_by=2",
                        f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black", "setsar=1", f"fps={fps}", LOOKS[style["look"]]]
             title = style["title"] if i == 0 else ""
             caption = shot.get("caption", "")
-            args = ["ffmpeg", "-v", "error", "-y", "-ss", str(shot["start"]), "-i", str(source)]
+            args = ["ffmpeg", "-v", "error", "-y", "-ss", str(seek), "-i", str(source)]
             if not asset["audio"]:
                 args += ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]
             overlay_index = 1 if asset["audio"] else 2
@@ -201,6 +208,8 @@ def export(store, pid, project, cancel=None, progress=lambda _: None, preview=Fa
                 store.save(current)
         for path in paths:
             path.unlink()
+        for temporary in directory.glob("ascii-*.mov"):
+            temporary.unlink()
         if joined.exists():
             joined.unlink()
         return result

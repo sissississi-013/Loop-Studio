@@ -179,7 +179,7 @@ def make_server(root, port):
                     if not target.is_relative_to(base) or parts[2] not in ('media', 'exports', 'analysis'):
                         raise PermissionError('Invalid file path')
                     return self.file(target)
-                target = (web / ('index.html' if path == '/' else path.lstrip('/'))).resolve()
+                target = (web / ('landing.html' if path == '/' else 'index.html' if path in ('/studio','/studio/') else path.lstrip('/'))).resolve()
                 if not target.is_relative_to(web.resolve()):
                     raise PermissionError('Invalid file path')
                 self.file(target)

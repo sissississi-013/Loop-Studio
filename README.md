@@ -17,13 +17,21 @@ pip install -e .
 loop-studio
 ```
 
-Open http://127.0.0.1:8766. No login, subscription, telemetry or model key is required for manual editing. Project files and media live in `.loop-studio/`, which is excluded from Git. Back up that entire folder to preserve projects and originals. Use `loop-studio --data /path/to/library --port 8766` to choose a location.
+Open http://127.0.0.1:8766 for the landing page, or http://127.0.0.1:8766/studio to edit. No login, subscription, telemetry or model key is required for manual editing. Project files and media live in `.loop-studio/`, which is excluded from Git. Back up that entire folder to preserve projects and originals. Use `loop-studio --data /path/to/library --port 8766` to choose a location.
 
 1. Add your clips, or choose **Try with sample footage** to explore the controls.
 2. Describe your film, optionally choose a mood or add a reference, then press **Make my film**. It analyzes missing footage, plans the cut and renders a playable draft in one job.
 3. Watch the draft and **Compare current cut**. The review shows actual shot thumbnails, calculated length and repeated-footage warnings. Ask for a change and preview the revision before choosing **Keep this cut**.
 4. Trim, reorder, caption or lock individual shots. Expand **The finishing touches** to adjust titles, color, typography and the original procedural music bed.
 5. **Export film** saves pending form edits and renders from original footage at 1080p. Your saved edit stays intact while you explore draft alternatives; keeping a draft is undoable.
+
+## Interface and ASCII
+
+The landing page has an animated character orbit and a **Character lab** with Orbit/Wave modes, motion controls, density adjustment and downloadable text frames. Reduced-motion preferences are respected. Its dark, restrained visual direction takes inspiration from [Moonshot](https://www.moonshot.ai/), with original Loop artwork and branding.
+
+The editor uses a media library, central viewer, Director/Inspector/ASCII tabs and a persistent timeline. Drag shots to reorder, change timeline zoom, click the ruler to seek, or use the Inspector for exact trims, captions and locks. Space plays/pauses outside form controls. The audio lane describes the current source/music mix; it is not a separate editable multitrack audio system.
+
+In the **ASCII** tab, choose **Paper terminal** or **Phosphor**, adjust character columns, and click **Preview treatment**. The whole film is converted frame by frame to characters, with original audio, titles and captions composed into the result. The effect is included in 1080p exports, saved per project and undoable. Choose **Off** to restore normal footage. Rendering is local and does not require a model or a new dependency beyond Pillow and FFmpeg.
 
 ## Optional models
 
