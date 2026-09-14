@@ -3,6 +3,8 @@ const $ = id => document.getElementById(id);
 let project = null, selected = null, proposal = null, playingShot = null, lastJobs = new Map(), config = {};
 let editChain = Promise.resolve();
 let jobRenderKey = null;
+let workflowBusy = false;
+let selectedMood = null;
 const dirty = new Set();
 const fileURL = path => `/files/${project.id}/${path}`;
 const time = seconds => `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(1).padStart(4, '0')}`;
@@ -23,12 +25,16 @@ async function refreshProjects() {
   return projects;
 }
 async function openProject(id) {
-  await editChain; if(dirty.size) throw new Error('Apply your pending changes before switching projects.'); dirty.clear(); project = await api(`/projects/${id}`); selected=null; proposal=null; playingShot=null;
+  await editChain; if(dirty.size) throw new Error('Apply your pending changes before switching projects.'); dirty.clear(); project = await api(`/projects/${id}`); selected=null; proposal=null; playingShot=null; selectedMood=null;
+  for(const node of document.querySelectorAll('[data-mood]')) node.classList.remove('active');
   localStorage.setItem('loop-project',id); $('viewer').pause(); $('viewer').removeAttribute('src'); $('viewer').load();
   $('viewer').parentElement.classList.remove('has-video'); render(); await refreshProjects();
-  const recent=project.exports.at(-1);
+  const recent=project.accepted_preview?.version===project.version?project.accepted_preview:project.exports.filter(e=>e.version===project.version).at(-1);
   if(recent) showVideo(fileURL(recent.path),project.name,`Version ${recent.version} · rendered ${recent.preview?'preview':'export'}`);
   else if(project.timeline.length) selectShot(project.timeline[0].id);
+  const jobs=await api('/jobs');
+  const savedDraft=jobs.filter(job=>job.project_id===project.id&&['Make my film','Draft edit'].includes(job.name)&&job.status==='completed'&&job.result.version===project.version).at(-1);
+  if(savedDraft) showProposal({...savedDraft.result,job_id:savedDraft.id},false);
 }
 async function reload() { if (!project) return; project=await api(`/projects/${project.id}`); render(); }
 function edit(operation) {
@@ -58,6 +64,10 @@ function render() {
   for(const [key,id] of Object.entries({aspect:'aspect',look:'look',title:'title',title_size:'title-size',font:'font',shot_seconds:'shot-seconds',title_position:'title-position',music:'music',source_volume:'source-volume',music_volume:'music-volume'})) setField(id,project.style[key]);
   if(!dirty.has('title-background')) $('title-background').checked=project.style.title_background;
   const clips=Object.values(project.assets).filter(a=>a.kind!=='reference');
+  document.body.classList.toggle('has-footage',clips.length>0);
+  $('step-footage').classList.toggle('active',!clips.length);
+  $('step-draft').classList.toggle('active',!!clips.length&&!project.timeline.length);
+  $('step-finish').classList.toggle('active',!!project.timeline.length);
   $('asset-count').textContent=`${clips.length} / 10`;
   $('assets').replaceChildren(...clips.map(assetCard));
   $('references').replaceChildren(...Object.values(project.assets).filter(a=>a.kind==='reference').map(assetCard));
@@ -65,8 +75,8 @@ function render() {
   $('discard').hidden=!dirty.size;
   $('undo').disabled=!project.undo.length; $('redo').disabled=!project.redo.length;
   $('preview').disabled=$('export').disabled=!project.timeline.length;
-  $('direct').disabled=$('analyze').disabled=!clips.length;
-  $('revise').disabled=!selected;
+  $('direct').disabled=!clips.length||workflowBusy; $('analyze').disabled=!clips.length||workflowBusy;
+  $('revise').disabled=!selected||workflowBusy;
   $('timeline-duration').textContent=time(project.timeline.reduce((sum,s)=>sum+s.end-s.start,0));
   $('shot-count').textContent=`${project.timeline.length} shots`;
   if(project.timeline.length) $('timeline').replaceChildren(...project.timeline.map((shot,index)=>{
@@ -79,6 +89,8 @@ function render() {
   })); else $('timeline').replaceChildren(el('p','Your story starts here. Add a shot from the footage library.','timeline-empty'));
   renderInspector(); renderExports();
   $('proposal').hidden=!proposal;
+  $('apply-proposal').disabled=!proposal||proposal.version!==project.version||workflowBusy;
+  $('apply-proposal').title=proposal&&proposal.version!==project.version?'This draft predates your latest edits. Make a fresh draft.':'';
 }
 function assetCard(asset) {
   const node=el('article',null,'asset'), top=el('div',null,'asset-top'), image=el('img');
@@ -89,7 +101,7 @@ function assetCard(asset) {
   actions.append(button('View',()=>showVideo(fileURL(asset.proxy),asset.name,'Full-duration source proxy')));
   if(asset.kind!=='reference') actions.append(button('+ Add shot',()=>edit({op:'add',asset_id:asset.id,start:0,end:Math.min(asset.duration,5)})));
   const analysis=project.analysis[asset.id];
-  if(asset.kind==='reference'&&analysis) actions.append(button('Use look & pace',()=>edit({op:'settings',style:analysis.reference_style})));
+  if(asset.kind==='reference'&&analysis) actions.append(button('Use look & pace',()=>edit({op:'settings',style:analysis.reference_style,explicit_style_keys:Object.keys(analysis.reference_style)})));
   node.append(actions);
   if(analysis) {
     const details=el('details'), summary=el('summary',analysis.mode==='model'?'AI notes · review for accuracy':'Sampled moments · offline');
@@ -149,20 +161,29 @@ async function pollJobs() {
     const previous=lastJobs.get(job.id);
     if(project&&job.project_id===project.id&&previous!==job.status&&job.status==='completed') {
       await reload();
-      if(job.name==='Draft edit') {
-        proposal=job.result; $('rationale').textContent=`${proposal.timeline.length} shots · ${time(proposal.duration)} calculated duration. ${proposal.mode==='model'?'Model explanation (review for accuracy): ':''}${proposal.rationale}`;
-        $('proposal-shots').replaceChildren(...proposal.timeline.map(s=>el('p',`${project.assets[s.asset_id].name}: ${time(s.start)}–${time(s.end)}`)));
-        $('proposal').hidden=false;
+      if(job.name==='Make my film'||job.name==='Draft edit') {
+        showProposal({...job.result,job_id:job.id});
       } else if(job.name==='Preview'||job.name==='Export') showVideo(fileURL(job.result.path),project.name,`Version ${job.result.version} · rendered ${job.result.preview?'preview':'export'}`);
     }
     lastJobs.set(job.id,job.status);
   }
+  const active=jobs.find(j=>j.project_id===project?.id&&['queued','running'].includes(j.status)&&['Make my film','Import'].includes(j.name));
+  workflowBusy=!!active;
+  $('workflow-progress').hidden=!active;
+  if(active) {
+    const copy=el('div');copy.append(el('strong',active.message),el('small','You can cancel. Your saved cut stays intact.'));
+    $('workflow-progress').replaceChildren(copy,button('Cancel',()=>api(`/jobs/${active.id}/cancel`,{})));
+  }
+  $('direct').disabled=workflowBusy||!Object.values(project?.assets||{}).some(a=>a.kind!=='reference');
+  $('revise-draft').disabled=workflowBusy;
+  $('apply-proposal').disabled=workflowBusy||!proposal||proposal.version!==project?.version;
   const shown=jobs.filter(j=>project&&j.project_id===project.id).slice(-5).reverse();
   const key=JSON.stringify(shown);
   if(key===jobRenderKey) return;
   jobRenderKey=key;
   $('jobs').replaceChildren(...shown.map(job=>{
     const node=el('div',null,`job ${job.status}`); node.append(el('span',`${job.name} · ${job.message}`));
+    if(['failed','cancelled'].includes(job.status)&&job.name==='Make my film') node.append(button('Retry draft',()=>makeFilm()));
     if(['queued','running'].includes(job.status)) node.append(button('Cancel',()=>api(`/jobs/${job.id}/cancel`,{})));
     return node;
   }));
@@ -178,13 +199,34 @@ bind('upload','change',async()=>{await uploadFiles($('upload').files);$('upload'
 bind('reference','change',async()=>{await uploadFiles($('reference').files,'reference');$('reference').value='';});
 bind('sample','click',()=>startJob('sample'));
 bind('analyze','click',()=>startJob('analyze',{use_model:$('use-model').checked}));
-bind('direct','click',async()=>{await edit({op:'settings',brief:$('brief').value});await startJob('direct',{version:project.version,brief:project.brief,duration:Number($('duration').value),use_model:$('use-model').checked});});
-bind('revise','click',async()=>{await edit({op:'settings',brief:$('brief').value});await startJob('direct',{version:project.version,brief:project.brief,duration:Number($('duration').value),use_model:$('use-model').checked,target_shot_id:selected});});
-bind('apply-proposal','click',async()=>{if(proposal.version!==project.version) throw new Error('This draft is based on an older edit. Request a fresh draft before applying it.'); await edit({op:'proposal',timeline:proposal.timeline});proposal=null;render();});
+bind('direct','click',()=>makeFilm());
+bind('revise','click',()=>makeFilm({target_shot_id:selected}));
+bind('revise-draft','click',()=>{
+  const feedback=$('draft-feedback').value.trim();
+  if(!feedback) throw new Error('Describe what you want to change first.');
+  return makeFilm({draft_timeline:proposal.timeline,draft_style:proposal.style,feedback,brief:`Original direction: ${project.brief}\nRequested revision: ${feedback}`});
+});
+bind('watch-proposal','click',()=>watchProposal());
+bind('watch-current','click',async()=>{
+  if(!project.timeline.length) return;
+  const current=project.accepted_preview?.version===project.version?project.accepted_preview:project.exports.filter(e=>e.version===project.version).at(-1);
+  if(current) showVideo(fileURL(current.path),'Your current cut','Current cut · rendered preview');
+  else await startJob('export',{version:project.version,preview:true});
+});
+bind('apply-proposal','click',async()=>{
+  if(dirty.size) throw new Error('Save or discard changes made after this draft before keeping it.');
+  if(proposal.version!==project.version) throw new Error('Your edit has changed since this draft. Make a fresh draft to keep your latest changes.');
+  const kept=proposal;
+  if(proposal.preview&&proposal.job_id) project=await api(`/projects/${project.id}/keep-film`,{version:project.version,job_id:proposal.job_id});
+  else await edit({op:'proposal',timeline:proposal.timeline});
+  proposal=null;render();
+  if(kept.preview) showVideo(fileURL(kept.preview.path),'Your film','Kept cut · rendered preview');
+  message('Cut kept. Make small adjustments below, or export the finished film.');
+});
 bind('dismiss-proposal','click',()=>{proposal=null;render();});
-bind('preview','click',()=>startJob('export',{version:project.version,preview:true}));
-bind('export','click',()=>startJob('export',{version:project.version}));
-bind('save-style','click',()=>edit({op:'settings',style:{aspect:$('aspect').value,look:$('look').value,title:$('title').value,title_size:Number($('title-size').value),font:$('font').value,shot_seconds:Number($('shot-seconds').value),title_position:$('title-position').value,title_background:$('title-background').checked,music:$('music').value,source_volume:Number($('source-volume').value),music_volume:Number($('music-volume').value)}}));
+bind('preview','click',async()=>{await savePending();await startJob('export',{version:project.version,preview:true});});
+bind('export','click',async()=>{await savePending();await startJob('export',{version:project.version});});
+bind('save-style','click',()=>edit({op:'settings',style:readStyle()}));
 bind('save-shot','click',()=>edit({op:'shot',shot_id:selected,changes:{start:Number($('trim-start').value),end:Number($('trim-end').value),volume:Number($('shot-volume').value),caption:$('shot-caption').value}}));
 bind('shot-lock','click',()=>edit({op:'shot',shot_id:selected,changes:{locked:!project.timeline.find(s=>s.id===selected).locked}}));
 bind('split-shot','click',()=>{if(!playingShot||playingShot.id!==selected) throw new Error('Select this shot in the source monitor before splitting.');return edit({op:'split',shot_id:selected,at:$('viewer').currentTime});});
@@ -198,21 +240,77 @@ drop.addEventListener('dragleave',()=>drop.classList.remove('dragging'));
 drop.addEventListener('drop',event=>{event.preventDefault();drop.classList.remove('dragging');safe(()=>uploadFiles(event.dataTransfer.files));});
 document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){event.preventDefault();safe(()=>edit({op:event.shiftKey?'redo':'undo'}));}});
 for(const id of ['project-name','brief','aspect','look','title','title-size','font','shot-seconds','title-position','title-background','music','source-volume','music-volume','trim-start','trim-end','shot-volume','shot-caption']) $(id).addEventListener('input',()=>{dirty.add(id);$('discard').hidden=false;$('save-state').textContent='Unapplied changes';});
+
+function readStyle() {
+  return {aspect:$('aspect').value,look:$('look').value,title:$('title').value,title_size:Number($('title-size').value),font:$('font').value,shot_seconds:Number($('shot-seconds').value),title_position:$('title-position').value,title_background:$('title-background').checked,music:$('music').value,source_volume:Number($('source-volume').value),music_volume:Number($('music-volume').value)};
+}
+async function savePending() {
+  const fields={name:$('project-name').value,brief:$('brief').value,style:readStyle()};
+  const shotFields=selected&&['trim-start','trim-end','shot-volume','shot-caption'].some(id=>dirty.has(id))?{start:Number($('trim-start').value),end:Number($('trim-end').value),volume:Number($('shot-volume').value),caption:$('shot-caption').value}:null;
+  const styleKeys={'aspect':'aspect','look':'look','title':'title','title-size':'title_size','font':'font','shot-seconds':'shot_seconds','title-position':'title_position','title-background':'title_background','music':'music','source-volume':'source_volume','music-volume':'music_volume'};
+  const explicit_style_keys=[...dirty].filter(k=>styleKeys[k]).map(k=>styleKeys[k]);
+  await editChain;
+  if(shotFields) await edit({op:'shot',shot_id:selected,changes:shotFields});
+  if(explicit_style_keys.length||fields.name!==project.name||fields.brief!==project.brief||JSON.stringify(fields.style)!==JSON.stringify(Object.fromEntries(Object.keys(fields.style).map(k=>[k,project.style[k]])))) await edit({op:'settings',...fields,explicit_style_keys});
+}
+async function makeFilm(extra={}) {
+  if(workflowBusy) return;
+  workflowBusy=true;$('direct').disabled=true;
+  try {
+    await savePending();
+    await startJob('make-film',{version:project.version,brief:project.brief,duration:$('duration').value==='auto'?Math.max(5,Math.min(30,Math.floor(Object.values(project.assets).filter(a=>a.kind!=='reference').reduce((n,a)=>n+a.duration,0)*.85))):Number($('duration').value),use_model:$('use-model').checked,mood:selectedMood,...extra});
+  } catch(error) { workflowBusy=false;$('direct').disabled=false;throw error; }
+}
+function watchProposal(start=0) {
+  if(!proposal?.preview) return;
+  showVideo(fileURL(proposal.preview.path),'Your proposed film','Draft · rendered preview',start);
+}
+function showProposal(result,focus=true) {
+  proposal=result;
+  $('draft-duration').textContent=`${time(result.duration)} · ${result.timeline.length} shots`;
+  $('rationale').textContent=`${result.mode==='model'?'Model explanation — review for accuracy: ':''}${result.rationale}`;
+  const metrics=el('div',null,'review-metrics');
+  if(result.review) metrics.append(el('span',`${result.review.changed} shots changed`),el('span',`${result.review.removed} removed`),el('span',`${result.review.locked} locked`));
+  if(result.direction) metrics.append(el('span',result.direction));
+  if(result.elapsed_seconds) metrics.append(el('span',`Ready in ${result.elapsed_seconds}s`));
+  $('review-summary').replaceChildren(metrics,...(result.review?.notes||[]).map(note=>el('p',note,'review-warning')));
+  let offset=0;
+  $('proposal-shots').replaceChildren(...result.timeline.map((shot,index)=>{
+    const start=offset;offset+=shot.end-shot.start;
+    const asset=project.assets[shot.asset_id], card=button('',()=>watchProposal(start));
+    card.setAttribute('aria-label',`Preview draft shot ${index+1}: ${asset.name}`);
+    const img=el('img');img.src=fileURL(result.preview?.thumbnails?.[index]||asset.poster);img.alt='';
+    card.append(img,el('span',`${index+1}. ${asset.name} · ${(shot.end-shot.start).toFixed(1)}s${shot.locked?' · locked':''}`));return card;
+  }));
+  $('apply-proposal').disabled=workflowBusy||result.version!==project.version;
+  $('watch-proposal').disabled=!result.preview;
+  $('watch-current').disabled=!project.timeline.length;
+  $('draft-feedback').value='';$('proposal').hidden=false;
+  if(result.preview&&(focus||!$('viewer').getAttribute('src'))) watchProposal();
+  if(focus) $('proposal').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+const moods={quiet:{look:'warm',font:'serif',shot_seconds:4,music:'ambient',title_position:'bottom-left'},bright:{look:'natural',font:'sans',shot_seconds:1.25,music:'pulse',title_position:'top-left'},editorial:{look:'mono',font:'sans',shot_seconds:3,music:'none',title_position:'bottom-left'}};
+for(const node of document.querySelectorAll('[data-mood]')) node.addEventListener('click',()=>{
+  selectedMood=node.dataset.mood;
+  const mood=moods[selectedMood];
+  const ids={look:'look',font:'font',shot_seconds:'shot-seconds',music:'music',title_position:'title-position'};
+  for(const [key,value] of Object.entries(mood)){ $(ids[key]).value=value;dirty.add(ids[key]); }
+  for(const sibling of document.querySelectorAll('[data-mood]')) sibling.classList.toggle('active',sibling===node);
+  $('save-state').textContent='Direction selected';$('discard').hidden=false;
+});
+
 async function boot() {
   config=await api('/config');
   $('use-model').disabled=!config.configured;
-  $('model-info').textContent=config.configured?`${config.model} · ${config.local?'Local endpoint':'Remote endpoint: sampled frames and brief will be sent when enabled'} · ${config.endpoint}`:'No model needed to edit. Offline drafts use image signals and a few pace keywords, not story understanding. Connect your model in the server environment for visual direction.';
+  const choice=localStorage.getItem('loop-director:'+config.endpoint);
+  $('use-model').checked=config.configured&&(choice===null?config.local:choice==='true');
+  $('use-model').addEventListener('change',()=>localStorage.setItem('loop-director:'+config.endpoint,String($('use-model').checked)));
+  $('model-info').textContent=config.configured?`${config.model}${config.planner_model!==config.model?` + ${config.planner_model} planner`:''} · ${config.local?'Runs on your computer; footage stays local':'Remote endpoint: sampled frames and brief will be sent when enabled'} · ${config.endpoint}`:'No model needed to edit. Offline drafts use image signals and a few pace keywords, not story understanding. Connect your model in the server environment for visual direction.';
   const projects=await refreshProjects(), remembered=localStorage.getItem('loop-project');
   let chosen=projects.find(p=>p.id===remembered)||projects[0];
   if(!chosen) chosen=await api('/projects',{name:'My first film'});
   await openProject(chosen.id);
   const initialJobs=await api('/jobs'); for(const job of initialJobs)lastJobs.set(job.id,job.status);
-  const savedDraft=initialJobs.filter(job=>job.project_id===project.id&&job.name==='Draft edit'&&job.status==='completed'&&job.result.version===project.version).at(-1);
-  if(savedDraft) {
-    proposal=savedDraft.result; $('rationale').textContent=`${proposal.timeline.length} shots · ${time(proposal.duration)} calculated duration. ${proposal.mode==='model'?'Model explanation (review for accuracy): ':''}${proposal.rationale}`;
-    $('proposal-shots').replaceChildren(...proposal.timeline.map(s=>el('p',`${project.assets[s.asset_id].name}: ${time(s.start)}–${time(s.end)}`)));
-    $('proposal').hidden=false;
-  }
   await pollJobs();
   setInterval(()=>safe(pollJobs),2000);
 }

@@ -124,7 +124,7 @@ class Store:
 
     @staticmethod
     def snapshot(project):
-        return copy.deepcopy({k: project[k] for k in ("name", "timeline", "style", "brief", "notes")})
+        return copy.deepcopy({**{k: project[k] for k in ("name", "timeline", "style", "brief", "notes")}, "style_overrides": project.get("style_overrides", [])})
 
     def update(self, pid, version, operation):
         with self.lock:
@@ -138,7 +138,9 @@ class Store:
                 if not p[source]:
                     raise ValueError(f"Nothing to {op}")
                 p[dest].append(before)
-                p.update(p[source].pop())
+                restored = p[source].pop()
+                p.update(restored)
+                p["style_overrides"] = restored.get("style_overrides", [])
             else:
                 self.apply(p, operation)
                 for index, shot in enumerate(before["timeline"]):
@@ -198,6 +200,12 @@ class Store:
             if "style" in operation:
                 if not set(operation["style"]) <= set(DEFAULT_STYLE):
                     raise ValueError("Unknown style property")
+                explicit = set(operation.get("explicit_style_keys", []))
+                if not explicit <= set(DEFAULT_STYLE):
+                    raise ValueError("Unknown explicit style property")
+                changed = {k for k,v in operation["style"].items() if p["style"].get(k) != v}
+                if explicit or changed:
+                    p["style_overrides"] = sorted(set(p.get("style_overrides", [])) | changed | explicit)
                 p["style"].update(operation["style"])
             for key in ("name", "brief"):
                 if key in operation:
@@ -209,5 +217,9 @@ class Store:
                 if shot.get("locked") and (i >= len(proposed) or proposed[i] != shot):
                     raise ValueError("Proposal changes a locked shot")
             p["timeline"] = proposed
+            if "style" in operation:
+                if not set(operation["style"]) <= set(DEFAULT_STYLE):
+                    raise ValueError("Unknown style property")
+                p["style"].update(operation["style"])
         else:
             raise ValueError("Unknown operation")

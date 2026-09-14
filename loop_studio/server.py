@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -38,7 +39,7 @@ class Jobs:
             if sum(j['status'] in ('queued', 'running') for j in self.items.values()) >= 12:
                 raise ValueError('Job queue is full. Wait for current operations.')
             jid = ident()
-            self.items[jid] = {'id': jid, 'project_id': pid, 'name': name, 'status': 'queued', 'message': 'Queued'}
+            self.items[jid] = {'id': jid, 'project_id': pid, 'name': name, 'status': 'queued', 'message': 'Queued', 'created_at': time.time()}
             cancel = self.cancels[jid] = threading.Event()
             self.save()
         def progress(message):
@@ -49,6 +50,7 @@ class Jobs:
             try:
                 with self.lock:
                     self.items[jid]['status'] = 'running'
+                    self.items[jid]['started_at'] = time.time()
                     self.save()
                 if cancel.is_set():
                     raise ValueError('Operation cancelled')
@@ -246,6 +248,23 @@ def make_server(root, port):
                 if action == 'analyze':
                     from .providers import analyze
                     return self.json(jobs.submit(pid, 'Analyze footage', lambda c, progress: analyze(store, pid, bool(data.get('use_model')), c, progress)), 202)
+                if action == 'keep-film':
+                    from .workflow import accept_film
+                    with jobs.lock:
+                        job = copy.deepcopy(jobs.items[data['job_id']])
+                    if job['project_id'] != pid or job['status'] != 'completed' or job['name'] != 'Make my film':
+                        raise ValueError('This draft is not ready for this project')
+                    return self.json(accept_film(store, pid, data['version'], job['result']))
+                if action == 'make-film':
+                    from .workflow import make_film
+                    if data.get('version') != p['version']:
+                        raise Conflict('Reload before requesting a draft')
+                    with jobs.lock:
+                        if any(j['project_id']==pid and j['name']=='Import' and j['status'] in ('running','queued') for j in jobs.items.values()):
+                            raise ValueError('Your footage is still importing. Wait for all clips before making the film.')
+                        if any(j['project_id']==pid and j['name']=='Make my film' and j['status'] in ('running','queued') for j in jobs.items.values()):
+                            raise ValueError('A draft is already being made for this project. Cancel it before starting another.')
+                        return self.json(jobs.submit(pid, 'Make my film', lambda c, progress: make_film(store, pid, p, data, c, progress)), 202)
                 if action == 'direct':
                     from .providers import direct
                     if data.get('version') != p['version']:

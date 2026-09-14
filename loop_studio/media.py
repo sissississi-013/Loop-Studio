@@ -124,7 +124,7 @@ def font_path(family="sans"):
     return None
 
 
-def export(store, pid, project, cancel=None, progress=lambda _: None, preview=False):
+def export(store, pid, project, cancel=None, progress=lambda _: None, preview=False, record=True):
     validate(project)
     if not project["timeline"]:
         raise ValueError("Add at least one shot to the timeline")
@@ -140,13 +140,16 @@ def export(store, pid, project, cancel=None, progress=lambda _: None, preview=Fa
     style = project["style"]
     font = font_path()
     paths = []
+    thumbnails = []
     duration = 0
+    timeline_time = 0
     try:
         for i, shot in enumerate(project["timeline"]):
             progress(f"Rendering shot {i + 1} of {len(project['timeline'])}")
             asset = project["assets"][shot["asset_id"]]
             source = store.directory(pid) / asset["original"]
-            seconds = round((shot["end"] - shot["start"]) * fps) / fps
+            timeline_time += shot["end"] - shot["start"]
+            seconds = (round(timeline_time * fps) - round(duration * fps)) / fps
             duration += seconds
             out = directory / f"shot-{i}.mov"
             filters = [f"scale={width}:{height}:force_original_aspect_ratio=decrease:force_divisible_by=2",
@@ -170,6 +173,9 @@ def export(store, pid, project, cancel=None, progress=lambda _: None, preview=Fa
                      "-pix_fmt", "yuv420p", "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", str(out)]
             run(args, cancel)
             paths.append(out)
+            thumbnail = directory / f"shot-{i}.jpg"
+            run(["ffmpeg", "-v", "error", "-y", "-ss", str(seconds/2), "-i", str(out), "-frames:v", "1", "-vf", "scale=240:-2", str(thumbnail)], cancel)
+            thumbnails.append(f"exports/{eid}/shot-{i}.jpg")
         listing = directory / "concat.txt"
         listing.write_text("\n".join(f"file '{p.name}'" for p in paths))
         joined = directory / "joined.mp4"
@@ -177,21 +183,22 @@ def export(store, pid, project, cancel=None, progress=lambda _: None, preview=Fa
              "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(joined)], cancel)
         final = directory / "film.mp4"
         if style["music"] != "none":
-            # Procedural music owned by the project: no downloaded soundtrack/license dependency.
-            pulse = "*(0.55+0.45*sin(2*PI*2*t))" if style["music"] == "pulse" else ""
-            expression = f"0.18*(sin(2*PI*220*t)+0.5*sin(2*PI*277.18*t)+0.3*sin(2*PI*329.63*t)){pulse}"
-            run(["ffmpeg", "-v", "error", "-y", "-i", str(joined), "-f", "lavfi", "-i", f"aevalsrc={expression}:s=48000:d={duration}",
+            from .soundtrack import compose
+            soundtrack = directory / "soundtrack.wav"
+            compose(soundtrack, duration, style["music"], cancel)
+            run(["ffmpeg", "-v", "error", "-y", "-i", str(joined), "-i", str(soundtrack),
                  "-filter_complex", f"[1:a]volume={style['music_volume']},afade=t=in:d=0.4,afade=t=out:st={max(0, duration-.8)}:d=0.8[m];[0:a][m]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95:latency=1[a]",
                  "-map", "0:v:0", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(final)], cancel)
         else:
             joined.replace(final)
         info = probe(final)
-        result = {"id": eid, "path": f"exports/{eid}/film.mp4", "version": project["version"], "preview": preview, **info}
+        result = {"id": eid, "path": f"exports/{eid}/film.mp4", "version": project["version"], "preview": preview, "thumbnails": thumbnails, **info}
         (directory / "timeline.json").write_text(json.dumps(project, indent=2))
-        with store.lock:
-            current = store.load(pid)
-            current["exports"].append(result)
-            store.save(current)
+        if record:
+            with store.lock:
+                current = store.load(pid)
+                current["exports"].append(result)
+                store.save(current)
         for path in paths:
             path.unlink()
         if joined.exists():

@@ -56,9 +56,9 @@ class MediaTests(unittest.TestCase):
             subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','color=blue:size=64x64:rate=30:duration=1',str(source)],check=True)
             store=Store(root/'projects');p=store.create();asset=ingest(store,p['id'],source,'silent.mp4')
             p=store.load(p['id'])
-            for _ in range(10):p=store.update(p['id'],p['version'],{'op':'add','asset_id':asset['id'],'start':0,'end':.5})
+            for _ in range(10):p=store.update(p['id'],p['version'],{'op':'add','asset_id':asset['id'],'start':0,'end':.55})
             result=export(store,p['id'],p,preview=True)
-            self.assertAlmostEqual(result['duration'],5,delta=.06)
+            self.assertAlmostEqual(result['duration'],5.5,delta=.04)
             self.assertTrue(result['audio'])
 
     def test_rotation_is_normalized_in_proxy_and_preserved_in_original(self):

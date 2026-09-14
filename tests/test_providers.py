@@ -72,3 +72,33 @@ class ProviderTests(unittest.TestCase):
         result=sample_asset(self.store,self.p['id'],asset,threading.Event())
         self.assertEqual(len(result['detected_cuts']),2)
         self.assertAlmostEqual(result['reference_style']['shot_seconds'],2,delta=.1)
+
+    def test_only_missing_asset_is_analyzed(self):
+        del self.p['analysis']['b']
+        self.store.save(self.p)
+        def analyze_one(store,pid,use_model,cancel,progress,asset_ids):
+            self.assertEqual(asset_ids,{'b'})
+            p=store.load(pid);p['analysis']['b']={'mode':'signals','candidates':[{'start':0,'end':3,'score':1}]};store.save(p)
+        with patch('loop_studio.providers.analyze',side_effect=analyze_one) as analysis:
+            direct(self.store,self.p['id'],self.p,{'duration':6},threading.Event(),lambda _:None)
+        analysis.assert_called_once()
+
+    def test_short_highlight_becomes_preferred_length_valid_segment(self):
+        self.p['analysis']['a']['candidates']=[{'start':1,'end':1.5,'score':1}]
+        self.p['style']['shot_seconds']=1.25
+        with patch('loop_studio.providers.model_json',return_value={'shots':[{'segment':0}]}):
+            result=direct(self.store,self.p['id'],self.p,{'use_model':True,'duration':5},threading.Event(),lambda _:None)
+        shot=result['timeline'][0]
+        self.assertAlmostEqual(shot['end']-shot['start'],1.25)
+        self.assertGreaterEqual(shot['start'],0)
+        self.assertLessEqual(shot['end'],20)
+
+    def test_unknown_segment_is_rejected(self):
+        with patch('loop_studio.providers.model_json',return_value={'shots':[{'segment':999}]}):
+            with self.assertRaisesRegex(ValueError,'segment IDs'):
+                direct(self.store,self.p['id'],self.p,{'use_model':True},threading.Event(),lambda _:None)
+
+    def test_full_model_draft_cannot_repeat_a_segment(self):
+        with patch('loop_studio.providers.model_json',return_value={'shots':[{'segment':0},{'segment':0}]}):
+            with self.assertRaisesRegex(ValueError,'repeats source footage'):
+                direct(self.store,self.p['id'],self.p,{'use_model':True},threading.Event(),lambda _:None)

@@ -2,6 +2,10 @@
 
 September 13, 2026. This report distinguishes working implementation from output-quality claims.
 
+## Workflow refinement after user feedback
+
+The initial alpha was rejected as insufficient. The new process is **Make my film → watch/compare → revise → keep → export**, with cached analysis, reference processing, explicit style preservation, validated segment selection and bounded repair. Read [the actual review cases](WORKFLOW_REVIEW.md) for failures, measured timings and limits. Thirty-six tests pass locally for this pass; the older results below are historical. These checks do not establish creator satisfaction.
+
 ## Implemented workflow
 
 Local import → full-duration proxy → timestamped candidate windows → brief-based proposal → review → editable timeline → original-source export. Manual editing does not need a model, account or paid service. The core and studio UI are MIT licensed.
@@ -9,7 +13,7 @@ Local import → full-duration proxy → timestamped candidate windows → brief
 - Originals remain byte-identical. Projects support ten source clips / ten minutes, plus three image/video references.
 - Trim, split, reorder, remove, per-shot volume and captions; position/content locks; version conflicts; saved projects; 100-step undo/redo; corrected footage notes.
 - Landscape/portrait/square 1080p, 30 fps H.264/AAC export; original audio, generated soundtrack, basic color looks, title typeface/placement/background. Preview renders the same edit at a lower resolution.
-- Offline full-duration image-signal sampling; optional OpenAI-compatible vision endpoint. Model requests are explicitly enabled, and the configured endpoint is shown.
+- Offline full-duration image-signal sampling; optional OpenAI-compatible vision endpoint. Configured local models default on; remote models require opting in. The choice is visible and remembered per endpoint.
 - Reference color suggestions and scene-change-based shot-length estimates, both editable. Selected-shot revisions preserve every untargeted shot. Proposals do not replace the timeline until applied.
 - Local sample onboarding, cancellable queued media work, restart status, media byte ranges, loopback binding and cross-origin/Host protection.
 
